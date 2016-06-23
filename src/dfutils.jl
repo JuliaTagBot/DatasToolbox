@@ -26,6 +26,7 @@ function migrateTypes!(df::DataFrame)
         end
     end
 end
+export migrateTypes!
         
 
 """
