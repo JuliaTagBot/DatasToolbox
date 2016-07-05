@@ -10,5 +10,11 @@ are a couple of things that I have noticed that could be very useful for quick t
   steps in an epoch or else you'll only get a few gradients in each epoch, it's not clear to me whether this would even work with a huge number of epochs
   (certainly it would take forever).
 + Obviously learning rate is crucial, but also be very careful about which algorithm you use.  While screwing around I noticed that the optimizers are much more
-  prone to "popping out" of the vicinity of the minima (than in the non-recurrent case) so methods with momentum like ADAM tend to be problematic.
+  prone to "popping out" of the vicinity of the minima (than in the non-recurrent case).  If you get too much popping out, turn the learning rate *way* down and
+  gradually bring it back up.
++ Despite this "popping out" behavior, methods with momentum don't always seem to be worse.
++ Shuffling data can sometimes be helpful, sometimes ordered data can lead the search in odd directions.
++ Deeply recurrent neural networks (i.e. multiple recurrent layers) can be a fucking nightmare.  Again, you'll have to be very careful with the learning rate,
+  batch size and optimization method used.  The typically require much smaller learning rates.  See if you can achieve whatever it is you are attempting by
+  adding ordinary fully-connected layers instead.  
 
