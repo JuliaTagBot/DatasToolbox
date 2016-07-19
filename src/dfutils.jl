@@ -59,3 +59,18 @@ function loadPickledDF(filename::AbstractString;
 end
 export loadPickledDF
 
+
+"""
+Shuffles a dataframe in place.
+"""
+function shuffle!(df::DataFrame)
+    permutation = shuffle(collect(1:size(df)[1]))
+    tdf = copy(df)
+    for i in 1:length(permutation)
+        df[i, :] = tdf[permutation[i], :]
+    end
+    return df
+end
+export shuffle!
+
+
