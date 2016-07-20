@@ -19,6 +19,12 @@ type DataHandler{T} <: AbstractDH{T}
     colsInput::Array{Symbol, 1}
     colsOutput::Array{Symbol, 1}
 
+    colsNormalize::Array{Symbol, 1}
+
+    mu::Array{T, 1}
+    norm::Array{T, 1}
+    userange::Bool
+
     # training data, is a subset of df
     dfTrain::DataFrame
     # testing data, is a subset of df
@@ -39,14 +45,84 @@ type DataHandler{T} <: AbstractDH{T}
     """
     function DataHandler(df::DataFrame; testfrac::AbstractFloat=0., shuffle::Bool=false,
                          input_cols::Array{Symbol}=Symbol[], 
-                         output_cols::Array{Symbol}=Symbol[])
+                         output_cols::Array{Symbol}=Symbol[],
+                         normalize_cols::Array{Symbol}=Symbol[],
+                         assign::Bool=false,
+                         userange::Bool=false)
         ndf = copy(df)
-        o = new(ndf, input_cols, output_cols)
-        split!(o, testfrac, shuffle=shuffle)
+        o = new(ndf, input_cols, output_cols, normalize_cols)
+        o.userange = userange
+        split!(o, testfrac, shuffle=shuffle, assign=assign)
+        computeNormalizeParameters!(o, dataset=:dfTrain)
+        if canNormalize(o)
+            normalizeTrain!(o)
+            if size(o.dfTest)[1] > 0 normalizeTest!(o) end
+        end
         return o
     end
 end
 export DataHandler
+
+
+"""
+Gets the parameters for centering and rescaling.
+
+Does this using the training dataframe by default, but can be set to use test.
+Exits normally if this doesn't need to be done for any columns.
+
+This should always be called before normalize!, that way you have control over what
+dataset the parameters are computed from.
+"""
+function computeNormalizeParameters!{T}(dh::AbstractDH{T}; dataset::Symbol=:dfTrain)
+    if length(dh.colsNormalize)==0 return end
+    df = getfield(dh, dataset)
+    mu = Array{T, 1}(length(dh.colsNormalize))
+    norm = Array{T, 1}(length(dh.colsNormalize))
+    for (i, col) in enumerate(dh.colsNormalize)
+        mu[i] = mean(df[col])
+        if dh.userange
+            norm[i] = maximum(df[col]) - minimum(df[col])
+        else
+            norm[i] = std(df[col])
+        end
+    end
+    dh.mu = mu
+    dh.norm = norm
+    return
+end
+export computeNormalizeParameters
+
+
+"""
+Determines whether the data in the datahandler can be normlized, i.e. because
+the parameters have or haven't been computed yet.
+"""
+function canNormalize(dh::AbstractDH)
+    can = isdefined(dh, :mu) && isdefined(dh, :norm)
+    can = can && length(dh.mu) == length(dh.colsNormalize)
+    can = can && length(dh.norm) == length(dh.colsNormalize)
+    return can
+end
+
+
+"""
+Centers and rescales the appropriate columns.
+"""
+function normalize!{T}(dh::AbstractDH{T}; dataset::Symbol=:dfTrain)
+    if !canNormalize(dh)
+        error("Trying to normalize before parameters have been computed.")
+    end
+    df = getfield(dh, dataset)
+    for (i, col) in enumerate(dh.colsNormalize)
+        df[col] = (df[col] - dh.mu[i])/dh.norm[i]
+    end
+    return
+end
+export normalize!
+normalizeTrain!(dh::AbstractDH) = normalize!(dh, dataset=:dfTrain)
+export normalizeTrain!
+normalizeTest!(dh::AbstractDH) = normalize!(dh, dataset=:dfTest)
+export normalizeTest!
 
 
 """

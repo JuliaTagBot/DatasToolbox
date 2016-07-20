@@ -74,3 +74,58 @@ end
 export shuffle!
 
 
+"""
+Converts a categorical variable into numerical values of the given type.
+
+Returns the mapping as well as the new array, but the mapping is just an array
+so it always maps to an integer
+"""
+function numericalCategories(otype::DataType, A::Array)
+    mapping = sort!(unique(A))
+    o = convert(Array{otype}, indexin(A, mapping))
+    return o, mapping
+end
+# define for DataArray type
+numericalCategories(otype::DataType, A::DataArray) = numericalCategories(otype, 
+        convert(Array, A))
+export numericalCategories
+
+
+"""
+Gets the default mapping of categorical variables which would be returned by
+numericalCategories.
+"""
+function getDefaultCategoricalMapping(A::Array)
+    return sort!(unique(A))
+end
+export getDefaultCategoricalMapping
+
+
+"""
+Converts a categorical value into numerical values of the given type.
+
+Returns the mapping.
+"""
+function numericalCategories!(otype::DataType, df::DataFrame, col::Symbol)
+    df[symbol(string(col)*"_Orig")] = df[col]
+    df[col], mapping = numericalCategories(otype, df[col])
+    return mapping
+end
+export numericalCategories!
+
+
+"""
+Converts categorical variables into numerical values for multiple columns in a
+dataframe.  For now doesn't return mapping, may have to implement some type of 
+mapping type.
+"""
+function numericalCategories!(otype::DataType, df::DataFrame, cols::Array{Symbol})
+    for col in cols
+        numericalCategories!(otype, df, col)
+    end
+    return
+end
+export numericalCategories!
+
+
+

@@ -9,6 +9,7 @@ using PyCall
 # explicit imports for overriding base
 import Base.serialize
 import Base.deserialize
+import Base.shuffle!
 
 
 # exports are done in files, it's just much easier
