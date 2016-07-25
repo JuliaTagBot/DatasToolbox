@@ -90,7 +90,7 @@ function computeNormalizeParameters!{T}(dh::AbstractDH{T}; dataset::Symbol=:dfTr
     dh.norm = norm
     return
 end
-export computeNormalizeParameters
+export computeNormalizeParameters!
 
 
 """
@@ -114,7 +114,7 @@ function normalize!{T}(dh::AbstractDH{T}; dataset::Symbol=:dfTrain)
     end
     df = getfield(dh, dataset)
     for (i, col) in enumerate(dh.colsNormalize)
-        df[col] = (df[col] - dh.mu[i])/dh.norm[i]
+        df[col] = (df[col] - dh.mu[i])./dh.norm[i]
     end
     return
 end
@@ -123,6 +123,29 @@ normalizeTrain!(dh::AbstractDH) = normalize!(dh, dataset=:dfTrain)
 export normalizeTrain!
 normalizeTest!(dh::AbstractDH) = normalize!(dh, dataset=:dfTest)
 export normalizeTest!
+
+
+"""
+Performs the inverse of the centering and rescaling operations on an array.
+"""
+function unnormalize!{T}(dh::AbstractDH{T}, X::Array{T, 2}, cols::Array{Symbol, 1})
+    err = "Array must have same number of dimensions as are to be inverted."
+    @assert size(X)[2] == length(cols) err
+    for (i, col) in enumerate(cols)
+        idx = find(dh.colsNormalize .== col)[1]
+        X[:, i] = dh.norm[idx]*X[:, i] + dh.mu[idx]
+    end
+end
+export unnormalize!
+
+
+"""
+Performs the inverse of the centering and rescaling operations on a rank-1 array.
+"""
+function unnormalize!{T}(dh::AbstractDH{T}, X::Array{T, 2}, col::Symbol)
+    unnormalize!(dh, X, [col])
+end
+export unnormalize!
 
 
 """
@@ -273,5 +296,6 @@ macro split(dh, constraint)
     return esc(o)
 end
 export @split
+
 
 
