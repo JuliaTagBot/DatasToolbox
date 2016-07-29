@@ -14,6 +14,7 @@ Attempts to convert all columns of a dataframe to Julia types.
 """
 function migrateTypes!(df::DataFrame)
     @pyimport datetime
+    @pyimport decimal
     for col in names(df)
         isinstance = pybuiltin("isinstance")
         pystr = pybuiltin("str")
@@ -23,6 +24,9 @@ function migrateTypes!(df::DataFrame)
             df[col] = convertCol(df, col, Date)
         elseif isinstance(df[1, col], datetime.datetime)
             df[col] = convertCol(df, col, DateTime)
+        # consider removing this, it's obscure and probably shouldn't always be checked
+        elseif isinstance(df[1, col], decimal.Decimal)
+            df[col] = convertCol(df, col, Float32)
         end
     end
 end
