@@ -75,6 +75,22 @@ function assignTrain!{T}(dh::TimeSeriesHandler{T}; sort::Bool=true)
     if isempty(dh.dfTrain) return end
     if sort sort!(dh.dfTrain, cols=[timeindex]) end 
     X_unshaped = convert(Array{T}, dh.dfTrain[:, dh.colsInput])
-    # TODO finish!
+    # TODO this was copy pasted, not from here
+    npoints = size(tdf)[1] - seq_length
+    X = zeros(npoints, seq_length, length(cols))
+    y = zeros(npoints, 1)
+    # the loop can only go this far
+    for i in 1:npoints
+        # nextx = [convert(Array, tdf[i+j, cols]) for j in 0:(seq_length-1)]
+        nextx = reshape(convert(Array, tdf[i:(i+seq_length-1), cols]),
+                        (1, seq_length, length(cols)))
+        X[i, :, :] = nextx
+        y[i, 1] = tdf[i+seq_length, cols[1]]
+    end
+    p = 0
+    if shuffle
+        X, y = shuffle_data(X, y)
+    end
+    return X, y
 end
 
