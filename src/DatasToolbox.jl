@@ -17,7 +17,7 @@ import Base.shuffle!
 include("dfutils.jl")
 include("utils.jl")
 include("DataHandler.jl")
-
+include("TimeSeriesHandler.jl")
 
 
 

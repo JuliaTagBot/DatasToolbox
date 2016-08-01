@@ -168,7 +168,7 @@ function assignTrain!{T}(dh::AbstractDH{T})
     y = convert(Array{T}, dh.dfTrain[:, dh.colsOutput])
     dh.X_train = X
     dh.y_train = y
-    return
+    return X, y
 end
 export assignTrain!
 
@@ -184,7 +184,7 @@ function assignTest!{T}(dh::AbstractDH{T})
     y = convert(Array{T}, dh.dfTest[:, dh.colsOutput])
     dh.X_test = X
     dh.y_test = y
-    return
+    return X, y
 end
 export assignTest!
 
@@ -222,7 +222,7 @@ export getTestData
 Creates a train, test split by index.  The index given is the last index of the training set.
 """
 function split!(dh::AbstractDH, index::Integer; assign::Bool=true)
-    @assert index <= size(dh.df)[1]
+    @assert index <= size(dh.df)[1] "Index value too large for dataframe."
     dh.dfTrain = dh.df[1:index, :]
     if index == size(dh.df)[1]
         dh.dfTest = DataFrame()
@@ -240,7 +240,7 @@ Creates a train, test split by fraction.  The fraction given is the test fractio
 """
 function split!(dh::AbstractDH, testfrac::AbstractFloat; shuffle::Bool=false,
                 assign::Bool=true)
-    @assert testfrac <= 1.0
+    @assert testfrac <= 1.0 "Test fraction must be ∈ [0, 1]."
     if shuffle shuffle!(dh) end
     index = convert(Int64, round((1. - testfrac)*size(dh.df)[1]))
     split!(dh, index, assign=assign)
