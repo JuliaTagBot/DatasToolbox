@@ -133,7 +133,7 @@ given (τ₀) will be in the training set, while all those with τ > τ₀ will 
 the test set.
 """
 function split!(dh::TimeSeriesHandler, τ₀::Integer; assign::Bool=true, sort::Bool=true)
-    constr = dh.df[dh.timeindex] .<= τ₀
+    constr = dh.df[dh.timeindex] .≤ τ₀
     dfTrain = dh.df[constr, :]
     dfTest = dh.df[!constr, :]
     if !isempty(dfTrain)
