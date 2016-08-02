@@ -74,7 +74,6 @@ function _get_assign_data{T}(dataframe::Symbol, dh::TimeSeriesHandler{T}; sort::
     df = getfield(dh, dataframe)
     if isempty(df) return end
     if sort sort!(df, cols=[dh.timeindex]) end 
-    # TODO this was copy pasted, not from here
     npoints = size(df)[1] - dh.seq_length
     X = Array{T}(npoints, dh.seq_length, length(dh.colsInput))
     y = Array{T}(npoints, length(dh.colsOutput))
@@ -300,6 +299,15 @@ Returns y_test directly from the dataframe for comparison with the output of gen
 function getRawTestTarget{T}(dh::TimeSeriesHandler{T})
     return convert(Array{T}, dh.dfTest[:, dh.colsOutput])
 end
+
+function getRawTestTarget{T}(dh::TimeSeriesHandler{T}, limit::Integer)
+    return convert(Array{T}, dh.dfTest[1:limit, dh.colsOutput])
+end
+
+function getRawTestTarget{T}(dh::TimeSeriesHandler{T}, slice::UnitRange)
+    return convert(Array{T}, dh.dfTest[slice, dh.colsOutput])
+end
 export getRawTestTarget
+
 
 

@@ -275,11 +275,12 @@ function _apply_constraint!(dh::AbstractDH, constraint::BitArray)
 end
 
 
+# TODO this is terrible, fix it
 """
 Splits the dataframe into training and test sets using nice syntax.
 
-For example, can do `@split dh x >= 3`.  This will make the test set of datapoints for
-which dh.df[:x] >= 3.
+For example, can do `@split dh x ≥ 3`.  This will make the test set of datapoints for
+which dh.df[:x] ≥ 3.
 """
 macro split(dh, constraint)
     dhsymb = Expr(:quote, dh)
