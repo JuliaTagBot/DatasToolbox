@@ -15,6 +15,7 @@ import Base.shuffle!
 # exports are done in files, it's just much easier
 
 include("dfutils.jl")
+include("tsutils.jl")
 include("utils.jl")
 include("DataHandler.jl")
 include("TimeSeriesHandler.jl")
