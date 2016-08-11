@@ -202,9 +202,16 @@ export assign!
 
 """
 Gets the training data input, output tuple.
+
+If flatten, attempts to flatten y.
 """
-function getTrainData(dh::AbstractDH)
-    return dh.X_train, dh.y_train
+function getTrainData(dh::AbstractDH; flatten::Bool=false)
+    X, y = dh.X_train, dh.y_train
+    if flatten
+        @assert size(y)[2] == 1 "Attempted to flatten rank-2 array."
+        y = squeeze(y, 2)
+    end
+    return X, y    
 end
 export getTrainData
 
@@ -212,8 +219,13 @@ export getTrainData
 """
 Gets the test data input, output tuple.
 """
-function getTestData(dh::AbstractDH)
-    return dh.X_test, dh.y_test
+function getTestData(dh::AbstractDH; flatten::Bool=false)
+    X, y = dh.X_test, dh.y_test
+    if flatten
+        @assert size(y)[2] == 1 "Attempted to flatten rank-2 array."
+        y = squeeze(y, 2)
+    end
+    return X, y
 end
 export getTestData
 

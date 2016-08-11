@@ -132,4 +132,71 @@ end
 export numericalCategories!
 
 
+"""
+Converts all null values (NaN's and Nullable()) to a particular value.
+Note this has to check whether the type is Nullable.
+"""
+function convertNulls!{T}(A::Array{T, 1}, newvalue::T)
+    if T <: Nullable
+        for i in 1:length(A)
+            if isnull(A[i])
+                A[i] = newvalue
+            end
+        end
+    end
+    if T <: AbstractFloat
+        for i in 1:length(A)
+            if isnan(A[i])
+                A[i] = newvalue
+            end
+        end
+    end
+    return A
+end
+export convertNulls!
+
+
+"""
+Converts all null vlaues (NA's, NaN's and Nullable()) to a particular value.
+"""
+function convertNulls{T}(A::DataArray{T}, newvalue::T)
+    A = convert(Array, A, newvalue)
+    convertNulls!(A, newvalue)
+    return DataArray(A)
+end
+export convertNulls
+
+
+"""
+Convert all null values in columns of a DataFrame to a particular value.
+"""
+function convertNulls!(df::DataFrame, cols::Array{Symbol, 1}, newvalue::Any)
+    for col in cols
+        df[col] = convertNulls(df[col], newvalue)
+    end
+    return
+end
+convertNulls!(df::DataFrame, col::Symbol, newvalue) = convertNulls!(df, [col], newvalue)
+export convertNulls!
+
+
+"""
+The default copy method for dataframe only copies one level deep, so basically it stores
+an array of columns.  If you assign elements of individual (column) arrays then, it can
+make changes to references to those arrays that exist elsewhere.
+
+This method instead creates a new dataframe out of copies of the (column) arrays.
+
+This is not named copy due to the fact that there is already an explicit copy(::DataFrame)
+implementation in dataframes.
+"""
+function copyColumns(df::DataFrame)
+    ndf = DataFrame()
+    for col in names(df)
+        ndf[col] = copy(df[col])
+    end
+    return ndf
+end
+export copyColumns
+
 
