@@ -271,6 +271,7 @@ NOTE to self:
     as opposed to just symbols.  By passing a literal value to the expression in eval,
     it's ok to evaluate objects the come from local scope in global scope.
 ========================================================================================#
+# TODO make functional version of split using getfield.
 
 
 """
@@ -333,7 +334,7 @@ Constrains either the test or training dataframe.  See the documentation for tho
 Note that these constraints are applied directly to the train or test dataframe,
 so some of the columns may be transformed in some way.
 
-For example: `@constrain dh test x .≥ 3
+For example: `@constrain dh test x .≥ 3`
 """
 macro constrain!(dh, traintest, constraint)
     constr_expr = Expr(:quote, constraint)
@@ -380,6 +381,21 @@ macro split!(dh, constraint)
     return esc(o)
 end
 export @split!
+
+
+"""
+Creates a dataframe from the test dataframe and a supplied prediction.  
+
+For the time being this only works if the prediction is a vector.
+"""
+function getTestAnalysisData(dh::AbstractDH, ŷ::Array; name::Symbol=:ŷ)
+    @assert length(size(ŷ)) == 1 ("getTestAnalysisData hasn't been implemented
+                                  for higher rank predictions yet.")
+    df = copy(dh.dfTest)
+    df[name] = ŷ
+    return df
+end
+export getTestAnalysisData
 
 
 
