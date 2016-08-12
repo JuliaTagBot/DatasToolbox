@@ -261,21 +261,97 @@ end
 export split!
 
 
-"""
-Used by @split, for internal use only.
+#========================================================================================
+NOTE to self:
+    I was getting seriously confused about the proper use of eval, especially as it
+    related to macros.  Because it always runs in global scope, I thought it had
+    to almost always be avoided.
 
-Generates useable constraints given those given algabreically.
+    The key thing that I was missing is that it is possible to pass it literal values,
+    as opposed to just symbols.  By passing a literal value to the expression in eval,
+    it's ok to evaluate objects the come from local scope in global scope.
+========================================================================================#
+
+
 """
-function _get_constraint(dhsymb::Symbol, names::Array{Symbol, 1}, compare::Expr)
-    args = copy(compare.args)
-    for i in (1, 3)
-        if args[i] in names
-            argsymb = Expr(:quote, args[i])
-            args[i] = Expr(:ref, :($dhsymb.df), argsymb)
+Used by constrain and split macros.  Looks through expressions for symbols of 
+columns, and replaces them with proper ref calls.
+"""
+function _replaceExprColNames!(expr::Expr, dh::AbstractDH, dfname::Symbol)
+    for (i, arg) in enumerate(expr.args)
+        # check for nested expressions
+        if isa(arg, Expr) 
+            _replaceExprColNames!(expr.args[i], dh, dfname)
+        elseif isa(arg, Symbol) && (arg ∈ names(getfield(dh, dfname)))
+            argsymb = Expr(:quote, arg)
+            expr.args[i] = :($dh.$dfname[$argsymb]) 
         end
     end
-    return Expr(:comparison, args[1], args[2], args[3])
+    return expr
 end
+
+
+"""
+Constrains the training dataframe to satisfy the provided constraint.
+
+Input should be in the form of ColumnName relation value.  For example
+x .> 3 imposes df[:x] .> 3.
+"""
+macro constrainTrain!(dh, constraint)
+    constr_expr = Expr(:quote, constraint)
+    o = quote
+        local constr = DatasToolbox._replaceExprColNames!($constr_expr, $dh, :dfTrain)
+        constr = eval(constr)
+        $dh.dfTrain = $dh.dfTrain[constr, :]
+    end
+    return esc(o)
+end
+export @constrainTrain!
+
+
+"""
+Constrains the test dataframe to satisfy the provided constriant.
+
+Input should be in the form of ColumnName relation value.  For example,
+x .> 3 imposes df[:x] .> 3.
+"""
+macro constrainTest!(dh, constraint)
+    constr_expr = Expr(:quote, constraint)
+    o = quote
+        local constr = DatasToolbox._replaceExprColNames!($constr_expr, $dh, :dfTest)
+        constr = eval(constr)
+        $dh.dfTest = $dh.dfTest[constr, :]
+    end
+    return esc(o)
+end
+export @constrainTest!
+
+
+"""
+Constrains either the test or training dataframe.  See the documentation for those.
+
+Note that these constraints are applied directly to the train or test dataframe,
+so some of the columns may be transformed in some way.
+
+For example: `@constrain dh test x .≥ 3
+"""
+macro constrain!(dh, traintest, constraint)
+    constr_expr = Expr(:quote, constraint)
+    if lowercase(string(traintest)) == "train"
+        dfname = Expr(:quote, :dfTrain)
+    elseif lowercase(string(traintest)) == "test"
+        dfname = Expr(:quote, :dfTest)
+    else
+        throw(ArgumentError("Dataframe to constrain must be either train or test."))
+    end
+    o = quote
+        local constr = DatasToolbox._replaceExprColNames!($constr_expr, $dh, $dfname)
+        constr = eval(constr)
+        setfield!($dh, $dfname, getfield($dh, $dfname)[constr, :])
+    end
+    return esc(o)
+end
+export @constrain!
 
 
 """
@@ -287,28 +363,24 @@ function _apply_constraint!(dh::AbstractDH, constraint::BitArray)
 end
 
 
-# TODO this is terrible, fix it
 """
-Splits the dataframe into training and test sets using nice syntax.
+Splits the data into training and test sets.  The test set will be the data for which
+the provided constraint is true.
 
-For example, can do `@split dh x ≥ 3`.  This will make the test set of datapoints for
-which dh.df[:x] ≥ 3.
+For example, `@split dh x .≥ 3.0` will set the test set to be df[:x] .≥ 3.0 and the
+training set to be df[:x] .< 3.0.
 """
-macro split(dh, constraint)
-    dhsymb = Expr(:quote, dh)
-    constrsymb = Expr(:quote, constraint)
-    # for now we separate into different types of expressions, starting with comparison
-    if constraint.head == :comparison
-        o = quote
-            local names_ = DataFrames.names($dh.df)
-            local constr = DatasToolbox._get_constraint($dhsymb, names_, $constrsymb)
-            local constraint = eval(constr)
-            DatasToolbox._apply_constraint!($dh, constraint)
-        end
+macro split!(dh, constraint)
+    constr_expr = Expr(:quote, constraint)
+    o = quote
+        local constr = DatasToolbox._replaceExprColNames!($constr_expr, $dh, :df)
+        constr = eval(constr)
+        DatasToolbox._apply_constraint!($dh, constr)
     end
     return esc(o)
 end
-export @split
+export @split!
+
 
 
 
