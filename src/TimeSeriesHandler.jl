@@ -88,14 +88,42 @@ function _get_assign_data{T}(dataframe::Symbol, dh::TimeSeriesHandler{T}; sort::
 end
 
 
+# TODO: this is not working, need to use shared arrays, may not be able to use @parallel
+"""
+Parallel version, used by assignTrain! and assignTest!.
+"""
+function _get_assign_data_parallel{T}(dataframe::Symbol, dh::TimeSeriesHandler{T}; sort::Bool=true)
+    df = getfield(dh, dataframe)
+    if isempty(df) return end
+    if sort sort!(df, cols=[dh.timeindex]) end 
+    npoints = size(df)[1] - dh.seq_length
+    X = Array{T}(npoints, dh.seq_length, length(dh.colsInput))
+    y = Array{T}(npoints, length(dh.colsOutput))
+    # this SHOULD work
+    @parallel for i in 1:npoints
+        nextx = reshape(convert(Array, df[i:(i+dh.seq_length-1), dh.colsInput]),
+                        (1, dh.seq_length, length(dh.colsInput)))
+        X[i, :, :] = nextx
+        y[i, :] = convert(Array, df[i+dh.seq_length, dh.colsOutput])
+    end
+    return X, y
+end
+
+
 """
 Assigns the training data.  X output will be of shape (samples, seq_length, seq_width).
 One should be extremely careful if not sorting.
 
 Note that this is silent if the dataframe is empty.
 """
-function assignTrain!(dh::TimeSeriesHandler; sort::Bool=true)
-    dh.X_train, dh.y_train = _get_assign_data(:dfTrain, dh, sort=sort)
+function assignTrain!(dh::TimeSeriesHandler; sort::Bool=true, parallel::Bool=false)
+    # TODO, again parallel not currently working
+    if parallel
+        gad = _get_assign_data_parallel
+    else
+        gad = _get_assign_data
+    end
+    dh.X_train, dh.y_train = gad(:dfTrain, dh, sort=sort)
 end
 export assignTrain!
 
@@ -308,6 +336,5 @@ function getRawTestTarget{T}(dh::TimeSeriesHandler{T}, slice::UnitRange)
     return convert(Array{T}, dh.dfTest[slice, dh.colsOutput])
 end
 export getRawTestTarget
-
 
 

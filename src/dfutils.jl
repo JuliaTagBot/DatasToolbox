@@ -189,6 +189,9 @@ This method instead creates a new dataframe out of copies of the (column) arrays
 
 This is not named copy due to the fact that there is already an explicit copy(::DataFrame)
 implementation in dataframes.
+
+Note that deepcopy is recursive, so this is NOT the same thing as deepcopy(df), which copies
+literally everything.
 """
 function copyColumns(df::DataFrame)
     ndf = DataFrame()

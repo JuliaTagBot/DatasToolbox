@@ -386,17 +386,38 @@ export @split!
 """
 Creates a dataframe from the test dataframe and a supplied prediction.  
 
-For the time being this only works if the prediction is a vector.
+The array names supplies the names for the columns, otherwise will generate default names.
+
+Also generates error columns which are the difference between predictions and test data.
+If squared_error, will also create a column with squared error.
+
+Note that this currently does nothing to handle transformations of the data.
 """
-function getTestAnalysisData(dh::AbstractDH, ŷ::Array; name::Symbol=:ŷ)
-    @assert length(size(ŷ)) == 1 ("getTestAnalysisData hasn't been implemented
-                                  for higher rank predictions yet.")
-    df = copy(dh.dfTest)
-    df[name] = ŷ
+function getTestAnalysisData(dh::AbstractDH, ŷ::Array; names::Array{Symbol, 1}=Symbol[],
+                             squared_error::Bool=true)
+    # convert vectors to matrices
+    if length(size(ŷ)) == 1
+        ŷ = reshape(ŷ, (length(ŷ), 1))
+    end
+    @assert size(ŷ)[2] == length(dh.colsOutput) ("Supplied array must have same number of 
+                                                  columns as the handler's output.")
+    if length(names) == 0
+        names = [symbol(string(col)*"_hat") for col in dh.colsOutput]
+    end
+    @assert length(dh.colsOutput) == length(names) ("Wrong number of provided names.")
+    # if ŷ is short it is assumed to correspond to begining of dataframe, useful for 
+    # time series where only a partial sequence has been generated
+    df = dh.dfTest[1:size(ŷ)[1], :]
+    for (idx, name) in enumerate(names)
+        df[name] = ŷ[:, idx]
+        df[symbol(string(name)*"_Error")] = df[name] - df[dh.colsOutput[idx]]
+        if squared_error
+            df[symbol(string(name)*"_Error²")] = df[symbol(string(name)*"_Error")].^2
+        end
+    end
     return df
 end
 export getTestAnalysisData
-
 
 
 
