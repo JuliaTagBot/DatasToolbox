@@ -356,12 +356,15 @@ export @constrain!
 
 
 """
-Used by @split, for internal use only.
+Splits the data into training and test sets using a BitArray that must correspond to elements
+of dh.df.  The elements of the dataframe for which the BitArray holds 1 will be in the test 
+set, the remaining elements will be in the training set.
 """
-function _apply_constraint!(dh::AbstractDH, constraint::BitArray)
+function split!(dh::AbstractDH, constraint::BitArray)
     dh.dfTest = dh.df[constraint, :]
     dh.dfTrain = dh.df[!constraint, :]
 end
+export split!
 
 
 """
@@ -376,7 +379,7 @@ macro split!(dh, constraint)
     o = quote
         local constr = DatasToolbox._replaceExprColNames!($constr_expr, $dh, :df)
         constr = eval(constr)
-        DatasToolbox._apply_constraint!($dh, constr)
+        DatasToolbox.split!($dh, constr)
     end
     return esc(o)
 end

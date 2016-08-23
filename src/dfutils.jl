@@ -31,7 +31,23 @@ function migrateTypes!(df::DataFrame)
     end
 end
 export migrateTypes!
-        
+
+
+"""
+Checks to see if the column is one of the types known to fuck up conversions.
+If so, makes the appropriate changes.
+"""
+function _fixBadPyConversions(pydf::PyObject, col::AbstractString)
+    @pyimport numpy as np
+    # TODO there are probably more types like this that need to be handled
+    if np.dtype(pydf[col]) == np.dtype("<M8[ns]")
+        newcol = pydf[col][:astype]("O")
+        return newcol[:values]
+    end
+    # if not, just return the column as an array
+    return pydf[col][:values]
+end
+
 
 """
 A function for converting python dataframes to Julia dataframes.
@@ -39,15 +55,58 @@ Note that dates are not automatically converted.  You can specify which
 columns are dates with the datecols argument.
 """
 function convertPyDF(df::PyObject; 
-                     migrate::Bool=true)
+                     migrate::Bool=true,
+                     fix_nones::Bool=true)
     jdf = DataFrame()
     for col in df[:columns]
-        jdf[symbol(col)] = df[col][:values]
+        jdf[symbol(col)] = _fixBadPyConversions(df, col)
     end
     if migrate migrateTypes!(jdf) end
+    # attempts to fix columns which wound up badly converted because of nones
+    if fix_nones
+        for col in names(jdf)
+            if !(eltype(jdf[col]) == PyObject) continue end
+            fixPyNones!(Any, jdf, col)
+        end
+    end
     return jdf
 end
 export convertPyDF
+
+
+"""
+Fixes a column of an imported python dataframe containing `None`s so that it is
+of the type dtype.  Nones are replaced with NA.
+"""
+function fixPyNones(dtype::DataType, a::DataArray)
+    newa = @data([pyeval("x is None", x=x) ? NA : convert(dtype, x) for x in a])
+    return newa
+end
+export fixPyNones
+
+
+function fixPyNones!(dtype::DataType, df::DataFrame, col::Symbol)
+    df[col] = fixPyNones(dtype, df[col])
+    return df
+end
+export fixPyNones!
+
+
+"""
+This converts a column of floats that should have been ints, but got converted to
+floats because it has missing values which were converted to NaN's.
+"""
+function convert(dtype::Union{Type{Int32}, Type{Int64}}, a::DataArray{Float32, 1})
+    newa = @data([isnan(x) ? NA : convert(dtype, x) for x in a])
+    return newa
+end
+export convert
+
+
+function convert(dtype::Union{Type{Int32}, Type{Int64}}, a::DataArray{Float64, 1})
+    newa = @data([isnan(x) ? NA : convert(dtype, x) for x in a])
+    return newa
+end
 
 
 """
