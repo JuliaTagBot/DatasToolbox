@@ -1,9 +1,22 @@
 
+
 """
 Converts a dataframe column to a date.
+
+This should now produce a type-proper DataArray.
 """
 function convertCol(df::DataFrame, col::Symbol, dtype::DataType)
-    return map(d -> convert(dtype, d), df[col])
+    # return map(d -> convert(dtype, d), df[col])
+    pyNone = pybuiltin("None")
+    o = DataArray(Vector{dtype}(length(df[col])))
+    for i in 1:length(o)
+        if df[col][i] == pyNone
+            o[i] = NA
+        else
+            o[i] = convert(dtype, df[col][i])
+        end
+    end
+    return o
 end
 export convertCol
 
@@ -88,6 +101,20 @@ export fixPyNones
 function fixPyNones!(dtype::DataType, df::DataFrame, col::Symbol)
     df[col] = fixPyNones(dtype, df[col])
     return df
+end
+export fixPyNones!
+
+
+"""
+This will attempt to detect all columns with bad python conversions and 
+automatically replace them (using type Any).
+"""
+function fixPyNones!(df::DataFrame)
+    for col in names(df)
+        if eltype(df[col]) == PyObject
+            fixPyNones!(Any, df, col)
+        end
+    end
 end
 export fixPyNones!
 
