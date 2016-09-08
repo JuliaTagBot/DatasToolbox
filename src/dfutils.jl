@@ -1,9 +1,12 @@
 
 
 """
-Converts a dataframe column to a date.
+    convertCol(df::DataFrame, col::Symbol, dtype::DataType)
 
-This should now produce a type-proper DataArray.
+Converts a column, possibly containing python objects, to a column with eltype `dtype`.
+The column itself will be a `DataArray` with `NA` values inserted where Python
+`None`s are found.  Note that this isn't terribly efficient because it has to check
+for `None`s.
 """
 function convertCol(df::DataFrame, col::Symbol, dtype::DataType)
     # return map(d -> convert(dtype, d), df[col])
@@ -23,7 +26,12 @@ export convertCol
 
 # TODO for now just checks the first element of each column
 """
-Attempts to convert all columns of a dataframe to Julia types.
+    migrateTypes!(df::DataFrame)
+
+Attempts to convert all columns of a dataframe to the proper type based on the Python
+types found in it.  
+**TODO** Right now this just checks the first elements in the column.  Also, will have
+to change `ASCIIString` conversion to `String` for Julia v0.5.
 """
 function migrateTypes!(df::DataFrame)
     @pyimport datetime
@@ -63,9 +71,12 @@ end
 
 
 """
-A function for converting python dataframes to Julia dataframes.
-Note that dates are not automatically converted.  You can specify which
-columns are dates with the datecols argument.
+    convertPyDF(df::PyObject; migrate::Bool=true, fix_nones::Bool=true)
+
+Converts a pandas dataframe to a Julia dataframe.  If `migrate` is true this will try
+to properly assign types to columns.  If `fix_nones` is true, this will check for columns
+which have eltype `PyObject` and convert them to have eltype `Any`, replacing all Python
+`None`s with `NA`.
 """
 function convertPyDF(df::PyObject; 
                      migrate::Bool=true,
@@ -88,8 +99,10 @@ export convertPyDF
 
 
 """
-Fixes a column of an imported python dataframe containing `None`s so that it is
-of the type dtype.  Nones are replaced with NA.
+    fixPyNones(dtype::DataType, a::DataArray)
+
+Attempts to convert a `DataArray` to have eltype `dtype` while replacing all Python
+`None`s with `NA`.
 """
 function fixPyNones(dtype::DataType, a::DataArray)
     newa = @data([pyeval("x is None", x=x) ? NA : convert(dtype, x) for x in a])
@@ -98,6 +111,12 @@ end
 export fixPyNones
 
 
+"""
+    fixPyNones!(dtype::DataType, df::DataFrame, col::Symbol)
+
+Attempts to convert a column of the dataframe to have eltype `dtype` while replacing all
+Python `None`s with `NA`.
+"""
 function fixPyNones!(dtype::DataType, df::DataFrame, col::Symbol)
     df[col] = fixPyNones(dtype, df[col])
     return df
@@ -106,8 +125,10 @@ export fixPyNones!
 
 
 """
-This will attempt to detect all columns with bad python conversions and 
-automatically replace them (using type Any).
+    fixPyNones!(df::DataFrame)
+
+Attempts to automatically convert all columns of a dataframe to have eltype `Any` while
+replacing all Python `None`s with `NA`.
 """
 function fixPyNones!(df::DataFrame)
     for col in names(df)
@@ -120,8 +141,11 @@ export fixPyNones!
 
 
 """
+    convert(dtype::Union{Type{Int32}, Type{Int64}}, a::DataArray)
+
 This converts a column of floats that should have been ints, but got converted to
 floats because it has missing values which were converted to NaN's.
+The supplied `DataArray` should have eltype `Float32` or `Float64`.
 """
 function convert(dtype::Union{Type{Int32}, Type{Int64}}, a::DataArray{Float32, 1})
     newa = @data([isnan(x) ? NA : convert(dtype, x) for x in a])
@@ -137,25 +161,30 @@ end
 
 
 """
-Loads a pickled python dataframe.
+    loadPickledDF(filename::AbstractString; migrate::Bool=true, fix_nones::Bool=true)
+
+Loads a pickled python dataframe, converting it to a Julia dataframe using `convertPyDF`.
 """
 function loadPickledDF(filename::AbstractString;
-                       migrate::Bool=true)
+                       migrate::Bool=true,
+                       fix_nones::Bool=true)
     f = pyeval("open(\"$filename\", \"rb\")")
     @pyimport pickle
     pydf = pickle.load(f)
-    df = convertPyDF(pydf, migrate=migrate)
+    df = convertPyDF(pydf, migrate=migrate, fix_nones=fix_nones)
     return df
 end
 export loadPickledDF
 
 
 """
+    shuffle!(df::DataFrame)
+
 Shuffles a dataframe in place.
 """
 function shuffle!(df::DataFrame)
     permutation = shuffle(collect(1:size(df)[1]))
-    tdf = copy(df)
+    tdf = copyColumns(df)
     for i in 1:length(permutation)
         df[i, :] = tdf[permutation[i], :]
     end
@@ -165,6 +194,8 @@ export shuffle!
 
 
 """
+    numericalCategories(otype::DataType, A::Array)
+
 Converts a categorical variable into numerical values of the given type.
 
 Returns the mapping as well as the new array, but the mapping is just an array
@@ -182,6 +213,8 @@ export numericalCategories
 
 
 """
+    getDefaultCategoricalMapping(A::Array)
+
 Gets the default mapping of categorical variables which would be returned by
 numericalCategories.
 """
@@ -192,7 +225,10 @@ export getDefaultCategoricalMapping
 
 
 """
-Converts a categorical value into numerical values of the given type.
+    numericalCategories!(otype::DataType, df::DataFrame, col::Symbol)
+
+Converts a categorical value in a column into a numerical variable of the given
+type.
 
 Returns the mapping.
 """
@@ -205,8 +241,12 @@ export numericalCategories!
 
 
 """
+    numericalCategories!(otype::DataType, df::DataFrame, cols::Array{Symbol}) 
+
 Converts categorical variables into numerical values for multiple columns in a
-dataframe.  For now doesn't return mapping, may have to implement some type of 
+dataframe.  
+
+**TODO** For now doesn't return mapping, may have to implement some type of 
 mapping type.
 """
 function numericalCategories!(otype::DataType, df::DataFrame, cols::Array{Symbol})
@@ -219,6 +259,8 @@ export numericalCategories!
 
 
 """
+    convertNulls!{T}(A::Array{T, 1}, newvalue::T)
+
 Converts all null values (NaN's and Nullable()) to a particular value.
 Note this has to check whether the type is Nullable.
 """
@@ -243,6 +285,8 @@ export convertNulls!
 
 
 """
+    convertNulls{T}(A::DataArray{T}, newvalue::T)
+
 Converts all null vlaues (NA's, NaN's and Nullable()) to a particular value.
 """
 function convertNulls{T}(A::DataArray{T}, newvalue::T)
@@ -254,9 +298,13 @@ export convertNulls
 
 
 """
+    convertNulls!(df::DataFrame, cols::Vector{Symbol}, newvalue::Any)
+
 Convert all null values in columns of a DataFrame to a particular value.
+
+There is also a method for passing a single column symbol, not as a vector.
 """
-function convertNulls!(df::DataFrame, cols::Array{Symbol, 1}, newvalue::Any)
+function convertNulls!(df::DataFrame, cols::Vector{Symbol}, newvalue::Any)
     for col in cols
         df[col] = convertNulls(df[col], newvalue)
     end
@@ -267,7 +315,9 @@ export convertNulls!
 
 
 """
-The default copy method for dataframe only copies one level deep, so basically it stores
+    copyColumns(df::DataFrame)
+
+The default copy method for dataframes only copies one level deep, so basically it stores
 an array of columns.  If you assign elements of individual (column) arrays then, it can
 make changes to references to those arrays that exist elsewhere.
 
@@ -276,8 +326,8 @@ This method instead creates a new dataframe out of copies of the (column) arrays
 This is not named copy due to the fact that there is already an explicit copy(::DataFrame)
 implementation in dataframes.
 
-Note that deepcopy is recursive, so this is NOT the same thing as deepcopy(df), which copies
-literally everything.
+Note that deepcopy is recursive, so this is *NOT* the same thing as deepcopy(df), which 
+copies literally everything.
 """
 function copyColumns(df::DataFrame)
     ndf = DataFrame()
@@ -287,5 +337,6 @@ function copyColumns(df::DataFrame)
     return ndf
 end
 export copyColumns
+
 
 

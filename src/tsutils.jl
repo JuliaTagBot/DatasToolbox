@@ -1,7 +1,12 @@
 
 
 """
-Returns the discrete difference.  First value will be NaN.
+    discreteDiff{T}(X::Array{T, 1})
+
+Returns the discrete difference between adjacent elements of a time series.  So, 
+for instance, if one has a time series ``y_{1},y_{2},\ldots,y_{N}`` this will return
+a set of ``δ`` such that ``δ_{i} = y_{i+1} - y_{i}``.  The first element of the returned
+array will be a `NaN`.
 """
 function discreteDiff{T}(X::Array{T, 1})
     if !(T <: AbstractFloat)
