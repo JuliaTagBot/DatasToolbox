@@ -1,5 +1,7 @@
 
 """
+    TimeSeriesHandler{T} <: AbstractDH{T}
+
 Type for handling time series data.  As with DataHandler it is intended taht most of
 the reformatting of the dataframe is done before passing it to an instance of this type.
 
@@ -40,7 +42,19 @@ type TimeSeriesHandler{T} <: AbstractDH{T}
     seq_length::Int64
 
     """
-    This constructor makes a fractional train, test split.  
+        TimeSeriesHandler(df::DataFrame, timeindex::Symbol, seq_length::Integer;
+                          shuffle::Bool=false, n_test_sequences::Integer=0,
+                          input_cols::Array{Symbol}=Symbol[],
+                          output_cols::Array{Symbol}=Symbol[],
+                          normalize_cols::Array{Symbol}=Symbol[],
+                          assign::Bool=false, userange::Bool=false)
+
+    Creates an object converting the data contained in `df` to properly formatted
+    time series data with fixed-length sequences.  It is required that the input dataframe
+    have a time index, the name of which should be passed as the second argument.
+    The keyword arguments are otherwise the same as for `DataHandler` but note that in 
+    this case it makes sense for `input_cols == output_cols` (in fact that is probably the
+    most common use case).
     """
     function TimeSeriesHandler(df::DataFrame, timeindex::Symbol, seq_length::Integer; 
                                shuffle::Bool=false,
@@ -92,7 +106,8 @@ end
 """
 Parallel version, used by assignTrain! and assignTest!.
 """
-function _get_assign_data_parallel{T}(dataframe::Symbol, dh::TimeSeriesHandler{T}; sort::Bool=true)
+function _get_assign_data_parallel{T}(dataframe::Symbol, dh::TimeSeriesHandler{T}; 
+                                      sort::Bool=true)
     df = getfield(dh, dataframe)
     if isempty(df) return end
     if sort sort!(df, cols=[dh.timeindex]) end 
@@ -111,10 +126,18 @@ end
 
 
 """
+    assignTrain!(dh::TimeSeriesHandler; sort::Bool=true, parallel::Bool=false)
+
 Assigns the training data.  X output will be of shape (samples, seq_length, seq_width).
-One should be extremely careful if not sorting.
+If `sort` is true, will sort the dataframe first.  One should be extremely careful if
+`sort` is false.  If `parallel` is true the data will be generated in parallel (using 
+workers, not threads).  This is useful because this data manipulation is complicated and
+potentially slow.
 
 Note that this is silent if the dataframe is empty.
+
+**TODO** I'm pretty sure the parallel version isn't working right because it doesn't
+use shared arrays.  Revisit in v0.5 with threads.
 """
 function assignTrain!(dh::TimeSeriesHandler; sort::Bool=true, parallel::Bool=false)
     # TODO, again parallel not currently working
@@ -129,6 +152,8 @@ export assignTrain!
 
 
 """
+    assignTest!(dh::TimeSeriesHandler; sort::Bool=true)
+
 Assigns the test data.  X output will be of shape (samples, seq_length, seq_width).
 One should be extremely careful if not sorting.
 
@@ -144,7 +169,9 @@ export assignTest!
 
 
 """
-Assigns both training and testing data.
+    assign!(dh::TimeSeriesHandler; sort::Bool=true)
+
+Assigns both training and testing data for the `TimeSeriesHandler`.
 """
 function assign!(dh::TimeSeriesHandler; sort::Bool=true)
     assignTrain!(dh, sort=sort)
@@ -155,6 +182,8 @@ export assign!
 
 
 """
+    split!(dh::TimeSeriesHandler, τ₀::Integer; assign::Bool=true, sort::Bool=true)
+
 Splits the data by time-index.  All datapoints with τ up to and including the timeindex
 given (τ₀) will be in the training set, while all those with τ > τ₀ will be in 
 the test set.
@@ -176,6 +205,9 @@ export split!
 
 
 """
+    splitByNSequences!(dh::TimeSeriesHandler, n_sequences::Integer;
+                       assign::Bool=true, sort::Bool=true)
+
 Splits the dataframe by the number of sequences in the test set.  This does nothing to
 account for the possibility of missing data.
 
@@ -202,6 +234,8 @@ end
 
 
 """
+    getSquashedTrainMatrix(dh::TimeSeriesHandler)
+
 Gets a training input tensor in which all the inputs are arranged along a single axis
 (i.e. in a matrix).
 
@@ -217,6 +251,8 @@ export getSquashedTrainMatrix
 
 
 """
+    getSquashedTestMatrix(dh::TimeSeriesHandler)
+
 Gets a test input tensor in which all the inputs are arranged along a single axis
 (i.e. in a matrix).
 
@@ -232,8 +268,10 @@ export getSquashedTestMatrix
 
 
 """
-Gets the training X, y pair where X is squashed using getSquahdedTrainMatrix.
-If flatten, also flatten y.
+    getSquashedTrainData(dh::TimeSeriesHandler; flatten::Bool=false)
+
+Gets the training X, y pair where X is squashed using `getSquahdedTrainMatrix`.
+If `flatten`, also flatten `y`.
 """
 function getSquashedTrainData(dh::TimeSeriesHandler; flatten::Bool=false)
     if flatten
@@ -248,6 +286,8 @@ export getSquashedTrainData
 
 
 """
+    trainOnMatrix(train::Function, dh::TimeSeriesHandler; flatten::Bool=true)
+
 Trains an object designed to take a matrix (as opposed to a rank-3 tensor) as input.
 The first argument is the function used to train.
 
@@ -273,11 +313,19 @@ export trainOnMatrix
 
 
 """
+    generateSequence(predict::Function, dh::TimeSeriesHandler,
+                     seq_length::Integer=8; on_matrix::Bool=false)
+                    
 Uses the supplied prediction function to generate a sequence of a specified length.
 The sequence uses the end of the training dataset as initial input.
 
 Note that this only makes sense if the intersection between the input and output columns
 isn't ∅.  For now we enforce that they must be identical.
+
+If `on_matrix` is true, the prediction function will take a matrix as input rather than
+a rank-3 tensor.
+
+**TODO** Fix this so that it works for arbitrary input, output.
 """
 function generateSequence{T}(predict::Function, dh::TimeSeriesHandler{T},
                              seq_length::Integer=8;
@@ -308,11 +356,13 @@ export generateSequence
 
 
 """
+    generateTest(predict::Function, dh::TimeSeriesHandler; on_matrix::Bool=true)
+
 Uses the supplied prediction function to attempt to predict the entire test set.
 Note that this assumes that the test set is ordered, sequential and immediately follows
 the training set.
 
-For now we enforce that the input and output columns are identical.
+See the documentation for `generateSequence`.
 """
 function generateTest(predict::Function, dh::TimeSeriesHandler;
                       on_matrix::Bool=true)
@@ -322,7 +372,9 @@ export generateTest
 
 
 """
-Returns y_test directly from the dataframe for comparison with the output of generateTest.
+    getRawTestTarget(dh::TimeSeriesHandler)
+
+Returns `y_test` directly from the dataframe for comparison with the output of generateTest.
 """
 function getRawTestTarget{T}(dh::TimeSeriesHandler{T})
     return convert(Array{T}, dh.dfTest[:, dh.colsOutput])

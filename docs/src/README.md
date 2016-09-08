@@ -14,5 +14,4 @@ list private methods.  All such methods have names that start with `_`.
 ```@autodocs
 Modules = [DatasToolbox]
 Private = false
-Pages = ["dfutils.jl", "utils.jl", "tsutils.jl"]
 ```

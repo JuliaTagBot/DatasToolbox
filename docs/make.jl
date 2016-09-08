@@ -1,3 +1,4 @@
+#!/usr/bin/julia
 using DatasToolbox
 using Documenter
 

@@ -1,9 +1,16 @@
 
+"""
+    AbstractDH{T}
+
+Abstract base class for data handler objects.
+"""
 abstract AbstractDH{T} <: Any
 export AbstractDH
 
 
 """
+    DataHandler{T} <: AbstractDH{T}
+
 Type for handling datasets.  This is basically a wrapper for a dataframe with methods
 for splitting it into training and test sets and creating input and output numerical
 arrays.  It is intended that most reformatting of the dataframe is done before passing
@@ -41,9 +48,18 @@ type DataHandler{T} <: AbstractDH{T}
     yhat_train::Array{T}
 
     """
-    This constructor makes a fractional train, test split.  
+        DataHandler{T}(df::DataFrame; testfrac::AbstractFloat=0.0, shuffle::Bool=false,
+                    input_cols::Array{Symbol}=Symbol[], output_cols::Array{Symbol}=Symbol[],
+                    normalize_cols::Array{Symbol}=Symbol[], assign::Bool=false,
+                    userange::Bool=false)
+
+    Constructor for a `DataHandler` object.  The resulting object will produce machine
+    learning datasets from the provided dataframe.  The columns for machine learning input
+    and output (target) should be provided with keywords `input_cols` and `output_cols`
+    respectively.  The constructor will randomly do a train-test split with test fraction
+    `testfrac`.  
     """
-    function DataHandler(df::DataFrame; testfrac::AbstractFloat=0., shuffle::Bool=false,
+    function DataHandler(df::DataFrame; testfrac::AbstractFloat=0.0, shuffle::Bool=false,
                          input_cols::Array{Symbol}=Symbol[], 
                          output_cols::Array{Symbol}=Symbol[],
                          normalize_cols::Array{Symbol}=Symbol[],
@@ -65,12 +81,15 @@ export DataHandler
 
 
 """
-Gets the parameters for centering and rescaling.
+    computeNormalizeParameters!{T}(dh::AbstractDH{T}; dataset::Symbol=:dfTrain)
+
+Gets the parameters for centering and rescaling from either the training dataset 
+(`dataset=:dfTrain`) or the test dataset (`dataset=:dfTest`).
 
 Does this using the training dataframe by default, but can be set to use test.
 Exits normally if this doesn't need to be done for any columns.
 
-This should always be called before normalize!, that way you have control over what
+This should always be called before `normalize!`, that way you have control over what
 dataset the parameters are computed from.
 """
 function computeNormalizeParameters!{T}(dh::AbstractDH{T}; dataset::Symbol=:dfTrain)
@@ -94,6 +113,8 @@ export computeNormalizeParameters!
 
 
 """
+    canNormalize(dh::AbstractDH)
+
 Determines whether the data in the datahandler can be normlized, i.e. because
 the parameters have or haven't been computed yet.
 """
@@ -106,7 +127,11 @@ end
 
 
 """
-Centers and rescales the appropriate columns.
+    normalize!{T}(dh::AbstractDH{T}; dataset::Symbol=:dfTrain)
+    normalizeTrain!(dh::AbstractDH)
+    normalizeTest!(dh::AbstractDH)
+
+Centers and rescales the columns set by `normalize_cols` in the `DataHandler` constructor.
 """
 function normalize!{T}(dh::AbstractDH{T}; dataset::Symbol=:dfTrain)
     if !canNormalize(dh)
@@ -126,9 +151,12 @@ export normalizeTest!
 
 
 """
-Performs the inverse of the centering and rescaling operations on an array.
+    unnormalize!{T}(dh::AbstractDH{T}, X::Matrix{T}, cols::Vector{Symbol})
+
+Performs the inverse of the centering and rescaling operations on a matrix.
+This can also be called on a single column with a `Symbol` as the last argument.
 """
-function unnormalize!{T}(dh::AbstractDH{T}, X::Array{T, 2}, cols::Array{Symbol, 1})
+function unnormalize!{T}(dh::AbstractDH{T}, X::Matrix{T}, cols::Vector{Symbol})
     err = "Array must have same number of dimensions as are to be inverted."
     @assert size(X)[2] == length(cols) err
     for (i, col) in enumerate(cols)
@@ -138,10 +166,6 @@ function unnormalize!{T}(dh::AbstractDH{T}, X::Array{T, 2}, cols::Array{Symbol, 
 end
 export unnormalize!
 
-
-"""
-Performs the inverse of the centering and rescaling operations on a rank-1 array.
-"""
 function unnormalize!{T}(dh::AbstractDH{T}, X::Array{T, 2}, col::Symbol)
     unnormalize!(dh, X, [col])
 end
@@ -149,6 +173,8 @@ export unnormalize!
 
 
 """
+    shuffle!(dh::AbstractDH)
+
 Shuffles the main dataframe of the DataHandler.
 """
 function shuffle!(dh::AbstractDH)
@@ -158,7 +184,9 @@ export shuffle!
 
 
 """
-Assigns the training data in the data handler.
+    assignTrain!(dh::AbstractDH)
+
+Assigns the training data in the data handler so it can be retrieved in proper form.
 
 Note that this is silent if the training dataframe is empty.
 """
@@ -174,6 +202,8 @@ export assignTrain!
 
 
 """
+    assignTest!(dh::AbstractDH)
+
 Assigns the test data in the data handler.
 
 Note that this is silent if the test dataframe is empty.
@@ -190,6 +220,8 @@ export assignTest!
 
 
 """
+    assign!(dh::AbstractDH)
+
 Assigns training and test data in the data handler.
 """
 function assign!{T}(dh::AbstractDH{T})
@@ -201,9 +233,11 @@ export assign!
 
 
 """
-Gets the training data input, output tuple.
+    getTrainData(dh::AbstractDH; flatten::Bool=false)
 
-If flatten, attempts to flatten y.
+Gets the training data input, output tuple `X, y`.
+
+If `flatten`, attempts to flatten `y`.
 """
 function getTrainData(dh::AbstractDH; flatten::Bool=false)
     X, y = dh.X_train, dh.y_train
@@ -217,7 +251,11 @@ export getTrainData
 
 
 """
-Gets the test data input, output tuple.
+    getTestData(dh::AbstractDH; flatten::Bool=false)
+
+Gets the test data input, output tuple `X, y`.
+
+If `flatten`, attempts to flatten `y`.
 """
 function getTestData(dh::AbstractDH; flatten::Bool=false)
     X, y = dh.X_test, dh.y_test
@@ -231,7 +269,10 @@ export getTestData
 
 
 """
+    split!(dh::AbstractDH, index::Integer; assign::Bool=true)
+
 Creates a train, test split by index.  The index given is the last index of the training set.
+If `assign`, this will assign the training and test data.
 """
 function split!(dh::AbstractDH, index::Integer; assign::Bool=true)
     @assert index ≤ size(dh.df)[1] "Index value too large for dataframe."
@@ -248,6 +289,9 @@ export split!
 
 
 """
+    split!(dh::AbstractDH, testfrac::AbstractFloat; shuffle::Bool=false,
+           assign::Bool=true)
+
 Creates a train, test split by fraction.  The fraction given is the test fraction.
 """
 function split!(dh::AbstractDH, testfrac::AbstractFloat; shuffle::Bool=false,
@@ -293,10 +337,12 @@ end
 
 
 """
+    @constrainTrain dh constraint
+
 Constrains the training dataframe to satisfy the provided constraint.
 
 Input should be in the form of ColumnName relation value.  For example
-x .> 3 imposes df[:x] .> 3.
+`x .> 3` imposes `df[:x] .> 3`.
 """
 macro constrainTrain!(dh, constraint)
     constr_expr = Expr(:quote, constraint)
@@ -311,10 +357,12 @@ export @constrainTrain!
 
 
 """
+    @constrainTest dh constraint
+
 Constrains the test dataframe to satisfy the provided constriant.
 
 Input should be in the form of ColumnName relation value.  For example,
-x .> 3 imposes df[:x] .> 3.
+`x .> 3` imposes `df[:x] .> 3`.
 """
 macro constrainTest!(dh, constraint)
     constr_expr = Expr(:quote, constraint)
@@ -329,12 +377,16 @@ export @constrainTest!
 
 
 """
+    @constrain! dh traintest constraint
+
 Constrains either the test or training dataframe.  See the documentation for those.
 
 Note that these constraints are applied directly to the train or test dataframe,
 so some of the columns may be transformed in some way.
 
 For example: `@constrain dh test x .≥ 3`
+
+**TODO** This still isn't working right.  Will probably have to wait for v0.5.
 """
 macro constrain!(dh, traintest, constraint)
     constr_expr = Expr(:quote, constraint)
@@ -356,6 +408,8 @@ export @constrain!
 
 
 """
+    split!(dh::AbstractDH, constraint::BitArray)
+
 Splits the data into training and test sets using a BitArray that must correspond to elements
 of dh.df.  The elements of the dataframe for which the BitArray holds 1 will be in the test 
 set, the remaining elements will be in the training set.
@@ -368,11 +422,15 @@ export split!
 
 
 """
+    @split! dh constraint
+
 Splits the data into training and test sets.  The test set will be the data for which
 the provided constraint is true.
 
-For example, `@split dh x .≥ 3.0` will set the test set to be df[:x] .≥ 3.0 and the
-training set to be df[:x] .< 3.0.
+For example, `@split dh x .≥ 3.0` will set the test set to be `df[:x] .≥ 3.0` and the
+training set to be `df[:x] .< 3.0`.
+
+**NOTE** This still isn't working right, will probably have to wait for v0.5.
 """
 macro split!(dh, constraint)
     constr_expr = Expr(:quote, constraint)
@@ -387,16 +445,19 @@ export @split!
 
 
 """
+    getTestAnalysisData(dh::AbstractDH, ŷ::Array; names::Vector{Symbol}=Symbol[],
+                        squared_error::Bool=true)
+
 Creates a dataframe from the test dataframe and a supplied prediction.  
 
 The array names supplies the names for the columns, otherwise will generate default names.
 
 Also generates error columns which are the difference between predictions and test data.
-If squared_error, will also create a column with squared error.
+If `squared_error`, will also create a column with squared error.
 
 Note that this currently does nothing to handle transformations of the data.
 """
-function getTestAnalysisData(dh::AbstractDH, ŷ::Array; names::Array{Symbol, 1}=Symbol[],
+function getTestAnalysisData(dh::AbstractDH, ŷ::Array; names::Vector{Symbol}=Symbol[],
                              squared_error::Bool=true)
     # convert vectors to matrices
     if length(size(ŷ)) == 1
