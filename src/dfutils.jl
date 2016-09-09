@@ -61,12 +61,13 @@ If so, makes the appropriate changes.
 function _fixBadPyConversions(pydf::PyObject, col::AbstractString)
     @pyimport numpy as np
     # TODO there are probably more types like this that need to be handled
-    if np.dtype(pydf[col]) == np.dtype("<M8[ns]")
-        newcol = pydf[col][:astype]("O")
+    pycol = get(pydf, col)
+    if np.dtype(pycol) == np.dtype("<M8[ns]")
+        newcol = pycol[:astype]("O")
         return newcol[:values]
     end
     # if not, just return the column as an array
-    return pydf[col][:values]
+    return pycol[:values]
 end
 
 
