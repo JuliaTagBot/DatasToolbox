@@ -436,7 +436,7 @@ macro split!(dh, constraint)
     constr_expr = Expr(:quote, constraint)
     o = quote
         local constr = DatasToolbox._replaceExprColNames!($constr_expr, $dh, :df)
-        constr = eval(:(esc(constr)))
+        constr = eval(:constr)
         DatasToolbox.split!($dh, constr)
     end
     return esc(o)

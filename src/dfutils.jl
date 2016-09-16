@@ -41,10 +41,11 @@ function migrateTypes!(df::DataFrame)
         pystr = pybuiltin("str")
         if isinstance(df[1, col], pystr)
             df[col] = convertCol(df, col, ASCIIString)
-        elseif isinstance(df[1, col], datetime.date)
-            df[col] = convertCol(df, col, Date)
+        # need to preserve the order of these because somehow date <: datetime
         elseif isinstance(df[1, col], datetime.datetime)
             df[col] = convertCol(df, col, DateTime)
+        elseif isinstance(df[1, col], datetime.date)
+            df[col] = convertCol(df, col, Date)
         # consider removing this, it's obscure and probably shouldn't always be checked
         elseif isinstance(df[1, col], decimal.Decimal)
             df[col] = convertCol(df, col, Float32)
@@ -340,4 +341,40 @@ end
 export copyColumns
 
 
+"""
+    applyCatConstraints(dict, df[, kwargs])
+
+Returns a copy of the dataframe `df` with categorical constraints applied.  `dict` should 
+be a dictionary with keys equal to column names in `df` and values equal to the categorical
+values that column is allowed to take on.  For example, to select gauge bosons we can
+pass `Dict(:PID=>[i for i in 21:24; -24])`.  Alternatively, the values in the dictionary
+can be functions which return boolean values, in which case the returned dataframe will
+be the one with column values for which the functions return true.
+
+Note that this requires that the dictionary values are either `Vector` or `Function` 
+(though one can of course mix the two types).
+
+Alternatively, instead of passing a `Dict` one can pass keywords, for example
+`applyCatConstraints(df, PID=[i for i in 21:24; -24])`.
+"""
+function applyCatConstraints(dict::Dict, df::DataFrame)
+    constr = Bool[true for i in 1:size(df)[1]]
+    for (col, values) in dict
+        constr &= if typeof(values) <: Vector
+            convert(BitArray, map(x -> x ∈ values, df[col]))
+        elseif typeof(values) <: Function
+            convert(BitArray, map(values, df[col]))
+        else
+            throw(ArgumentError("Constraints must be either vectors or functions."))
+        end
+    end
+    return df[constr, :]
+end
+
+function applyCatConstraints(df::DataFrame; kwargs...)
+    dct = Dict([x=>y for (x, y) in kwargs])
+    applyCatConstraints(dct, df)
+end
+
+export applyCatConstraints
 
