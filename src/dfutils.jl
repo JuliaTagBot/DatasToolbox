@@ -57,9 +57,9 @@ export migrateTypes!
 
 """
 Checks to see if the column is one of the types known to fuck up conversions.
-If so, makes the appropriate changes.
+If so, makes the appropriate changes.  Note that columns can be integers.
 """
-function _fixBadPyConversions(pydf::PyObject, col::AbstractString)
+function _fixBadPyConversions(pydf::PyObject, col::Union{AbstractString, Integer})
     @pyimport numpy as np
     # TODO there are probably more types like this that need to be handled
     pycol = get(pydf, col)
