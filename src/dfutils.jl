@@ -30,8 +30,7 @@ export convertCol
 
 Attempts to convert all columns of a dataframe to the proper type based on the Python
 types found in it.  
-**TODO** Right now this just checks the first elements in the column.  Also, will have
-to change `ASCIIString` conversion to `String` for Julia v0.5.
+**TODO** Right now this just checks the first elements in the column. 
 """
 function migrateTypes!(df::DataFrame)
     @pyimport datetime
@@ -40,7 +39,7 @@ function migrateTypes!(df::DataFrame)
         isinstance = pybuiltin("isinstance")
         pystr = pybuiltin("str")
         if isinstance(df[1, col], pystr)
-            df[col] = convertCol(df, col, ASCIIString)
+            df[col] = convertCol(df, col, String)
         # need to preserve the order of these because somehow date <: datetime
         elseif isinstance(df[1, col], datetime.datetime)
             df[col] = convertCol(df, col, DateTime)
@@ -372,7 +371,7 @@ function applyCatConstraints(dict::Dict, df::DataFrame)
 end
 
 function applyCatConstraints(df::DataFrame; kwargs...)
-    dct = Dict([x=>y for (x, y) in kwargs])
+    dct = Dict(kwargs)
     applyCatConstraints(dct, df)
 end
 
