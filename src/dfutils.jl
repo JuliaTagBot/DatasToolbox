@@ -374,6 +374,23 @@ function applyCatConstraints(df::DataFrame; kwargs...)
     dct = Dict(kwargs)
     applyCatConstraints(dct, df)
 end
-
 export applyCatConstraints
+
+
+"""
+    pandas(df)
+
+Convert a dataframe to a pandas pyobject.
+"""
+function pandas(df::DataFrame)::PyObject
+    @pyimport pandas as pd
+    pydf = pd.DataFrame()
+    for col in names(df)
+        set!(pydf, string(col), df[col])
+    end
+    return pydf
+end
+export pandas
+
+
 

@@ -11,6 +11,7 @@ import Base.serialize
 import Base.deserialize
 import Base.shuffle!
 import Base.convert
+import Base.normalize!
 
 
 # exports are done in files, it's just much easier
