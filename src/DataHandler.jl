@@ -466,7 +466,7 @@ function getTestAnalysisData(dh::AbstractDH, ŷ::Array; names::Vector{Symbol}=S
     @assert size(ŷ)[2] == length(dh.colsOutput) ("Supplied array must have same number of 
                                                   columns as the handler's output.")
     if length(names) == 0
-        names = [symbol(string(col)*"_hat") for col in dh.colsOutput]
+        names = [Symbol(string(col)*"_hat") for col in dh.colsOutput]
     end
     @assert length(dh.colsOutput) == length(names) ("Wrong number of provided names.")
     # if ŷ is short it is assumed to correspond to begining of dataframe, useful for 
@@ -474,9 +474,9 @@ function getTestAnalysisData(dh::AbstractDH, ŷ::Array; names::Vector{Symbol}=S
     df = dh.dfTest[1:size(ŷ)[1], :]
     for (idx, name) in enumerate(names)
         df[name] = ŷ[:, idx]
-        df[symbol(string(name)*"_Error")] = df[name] - df[dh.colsOutput[idx]]
+        df[Symbol(string(name)*"_Error")] = df[name] - df[dh.colsOutput[idx]]
         if squared_error
-            df[symbol(string(name)*"_Error²")] = df[symbol(string(name)*"_Error")].^2
+            df[Symbol(string(name)*"_Error²")] = df[Symbol(string(name)*"_Error")].^2
         end
     end
     return df

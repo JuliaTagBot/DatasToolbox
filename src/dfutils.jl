@@ -84,7 +84,7 @@ function convertPyDF(df::PyObject;
                      fix_nones::Bool=true)
     jdf = DataFrame()
     for col in df[:columns]
-        jdf[symbol(col)] = _fixBadPyConversions(df, col)
+        jdf[Symbol(col)] = _fixBadPyConversions(df, col)
     end
     if migrate migrateTypes!(jdf) end
     # attempts to fix columns which wound up badly converted because of nones
@@ -234,7 +234,7 @@ type.
 Returns the mapping.
 """
 function numericalCategories!(otype::DataType, df::DataFrame, col::Symbol)
-    df[symbol(string(col)*"_Orig")] = df[col]
+    df[Symbol(string(col)*"_Orig")] = df[col]
     df[col], mapping = numericalCategories(otype, df[col])
     return mapping
 end
