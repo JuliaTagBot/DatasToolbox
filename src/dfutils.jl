@@ -162,20 +162,51 @@ end
 
 
 """
-    loadPickledDF(filename::AbstractString; migrate::Bool=true, fix_nones::Bool=true)
+    unpickle([dtype,] filename[, migrate, fix_nones])
 
-Loads a pickled python dataframe, converting it to a Julia dataframe using `convertPyDF`.
+Deserializes a python pickle file and returns the object it contains.
+Additionally, if `DataFrame` is given as the first argument, will
+attempt to convert the object to a Julia dataframe with the flags
+`migrate` and `fix_nones` (see `convertPyDF`).
 """
-function loadPickledDF(filename::AbstractString;
-                       migrate::Bool=true,
-                       fix_nones::Bool=true)
-    f = pyeval("open(\"$filename\", \"rb\")")
-    @pyimport pickle
-    pydf = pickle.load(f)
-    df = convertPyDF(pydf, migrate=migrate, fix_nones=fix_nones)
-    return df
+function unpickle(filename::AbstractString)
+    @pyimport pickle as pypickle
+    f = pyeval("open('$filename', 'rb')")
+    pyobj = pypickle.load(f)
 end
-export loadPickledDF
+
+function unpickle(dtype::Type{DataFrame}, filename::AbstractString;
+                  migrate::Bool=true,
+                  fix_nones::Bool=true)
+    f = pyeval("open('$filename', 'rb')")
+    @pyimport pickle as pypickle
+    pydf = pypickle.load(f)
+    df = convertPyDF(pydf, migrate=migrate, fix_nones=fix_nones)
+end
+export unpickle
+
+
+"""
+    pickle(filename, object)
+
+Converts the provided object to a PyObject and serializes it in
+the python pickle format.  If the object provided is a `DataFrame`,
+this will first convert it to a pandas dataframe.
+"""
+function pickle(filename::AbstractString, object::Any)
+    @pyimport pickle as pypickle
+    pyobject = PyObject(object)
+    f = pyeval("open('$filename', 'wb')")
+    pypickle.dump(pyobject, f)
+end
+
+function pickle(filename::AbstractString, df::DataFrame)
+    @pyimport pickle as pypickle
+    pydf = pandas(df)
+    f = pyeval("open('$filename', 'wb')")
+    pypickle.dump(pydf, f)
+end
+export pickle
 
 
 """
