@@ -60,11 +60,13 @@ If so, makes the appropriate changes.  Note that columns can be integers.
 """
 function _fixBadPyConversions(pydf::PyObject, col::Union{AbstractString, Integer})
     @pyimport numpy as np
-    # TODO there are probably more types like this that need to be handled
     pycol = get(pydf, col)
     if np.dtype(pycol) == np.dtype("<M8[ns]")
-        newcol = pycol[:astype]("O")
-        return newcol[:values]
+        # this should have no choice but to always return datetime
+        newcol = [dt for dt in pycol]
+        return newcol
+        # newcol = pycol[:astype]("O")
+        # return newcol[:values]
     end
     # if not, just return the column as an array
     return pycol[:values]
@@ -423,5 +425,21 @@ function pandas(df::DataFrame)::PyObject
 end
 export pandas
 
+
+# TODO this should only be temporary!!!
+"""
+    writeFeather(filename, df)
+
+Writes the dataframe `df` to a feather by first converting to python.
+Note that this is only a temporary solution while Feather.jl matures.
+
+Note that `feather` must be installed in Python3.
+"""
+function writeFeather(filename::String, df::DataFrame)
+    pydf = pandas(df)
+    @pyimport feather as pyfeather
+    pyfeather.write_dataframe(pydf, filename)
+end
+export writeFeather
 
 
