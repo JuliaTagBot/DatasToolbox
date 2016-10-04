@@ -83,7 +83,7 @@ which have eltype `PyObject` and convert them to have eltype `Any`, replacing al
 """
 function convertPyDF(df::PyObject; 
                      migrate::Bool=true,
-                     fix_nones::Bool=true)
+                     fix_nones::Bool=true)::DataFrame
     jdf = DataFrame()
     for col in df[:columns]
         jdf[Symbol(col)] = _fixBadPyConversions(df, col)
@@ -171,7 +171,7 @@ Additionally, if `DataFrame` is given as the first argument, will
 attempt to convert the object to a Julia dataframe with the flags
 `migrate` and `fix_nones` (see `convertPyDF`).
 """
-function unpickle(filename::AbstractString)
+function unpickle(filename::String)::PyObject
     @pyimport pickle as pypickle
     f = pyeval("open('$filename', 'rb')")
     pyobj = pypickle.load(f)
@@ -179,7 +179,7 @@ end
 
 function unpickle(dtype::Type{DataFrame}, filename::AbstractString;
                   migrate::Bool=true,
-                  fix_nones::Bool=true)
+                  fix_nones::Bool=true)::DataFrame
     f = pyeval("open('$filename', 'rb')")
     @pyimport pickle as pypickle
     pydf = pypickle.load(f)
@@ -195,14 +195,14 @@ Converts the provided object to a PyObject and serializes it in
 the python pickle format.  If the object provided is a `DataFrame`,
 this will first convert it to a pandas dataframe.
 """
-function pickle(filename::AbstractString, object::Any)
+function pickle(filename::String, object::Any)
     @pyimport pickle as pypickle
     pyobject = PyObject(object)
     f = pyeval("open('$filename', 'wb')")
     pypickle.dump(pyobject, f)
 end
 
-function pickle(filename::AbstractString, df::DataFrame)
+function pickle(filename::String, df::DataFrame)
     @pyimport pickle as pypickle
     pydf = pandas(df)
     f = pyeval("open('$filename', 'wb')")
@@ -298,23 +298,24 @@ export numericalCategories!
 Converts all null values (NaN's and Nullable()) to a particular value.
 Note this has to check whether the type is Nullable.
 """
-function convertNulls!{T}(A::Array{T, 1}, newvalue::T)
-    if T <: Nullable
-        for i in 1:length(A)
-            if isnull(A[i])
-                A[i] = newvalue
-            end
-        end
-    end
-    if T <: AbstractFloat
-        for i in 1:length(A)
-            if isnan(A[i])
-                A[i] = newvalue
-            end
+function convertNulls!{T <: AbstractFloat}(A::Vector{T}, newvalue::T)
+    for i in 1:length(A)
+        if isnan(A[i])
+            A[i] = newvalue
         end
     end
     return A
 end
+
+function convertNulls!{T <: Nullable}(A::Vector{T}, newvalue::T)
+    for i in 1:length(A)
+        if isnull(A[i])
+            A[i] = newvalue
+        end
+    end
+    return A
+end
+
 export convertNulls!
 
 
@@ -323,6 +324,21 @@ export convertNulls!
 
 Converts all null vlaues (NA's, NaN's and Nullable()) to a particular value.
 """
+function convertNulls{T}(A::Vector{Nullable{T}}, newvalue::T)
+    newA = Vector{T}(length(A))
+    for i in 1:length(A)
+        if isnull(A[i])
+            newA[i] = newvalue
+        end
+    end
+    return newA
+end
+
+function convertNulls{T}(A::DataArray{Nullable{T}}, newvalue::T)
+    A = convert(Array, A, newvalue)
+    return convertNulls(A, newvalue)
+end
+
 function convertNulls{T}(A::DataArray{T}, newvalue::T)
     A = convert(Array, A, newvalue)
     convertNulls!(A, newvalue)
@@ -373,6 +389,7 @@ end
 export copyColumns
 
 
+# this may be very inefficient due to the way Julia type optimization works
 """
     applyCatConstraints(dict, df[, kwargs])
 
@@ -420,10 +437,31 @@ function pandas(df::DataFrame)::PyObject
     pydf = pd.DataFrame()
     for col in names(df)
         set!(pydf, string(col), df[col])
+        # convert datetime to proper numpy type
+        if eltype(df[col]) == DateTime
+            set!(pydf, string(col), 
+                 get(pydf, string(col))[:astype]("<M8[ns]"))
+        end
     end
     return pydf
 end
 export pandas
+
+
+"""
+    constrainDF(df, constraints)
+
+Returns a constrained dataframe.  For each key `k` in `constraints`, only the elements
+of `df` with `df[i, k] ∈ constraints[k]` will be present in the constrained dataframe.
+"""
+function constrainDF(df::DataFrame, constraints::Dict)::DataFrame
+    inrow = Bool[true for i in 1:size(df)[1]]
+    for (col, values) in constraints
+        inrow &= convert(BitArray, map(x -> x ∈ values, df[col]))
+    end
+    df = df[inrow, :]
+end
+export constrainDF
 
 
 # TODO this should only be temporary!!!
