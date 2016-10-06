@@ -1,7 +1,8 @@
 using DatasToolbox
 using DataFrames
 
-df = DataFrame(100*rand(100, 4))
+df = makeTestDF(Float64, Float64, Float64, Float64)
+names!(df, [:x1, :x2, :x3, :x4])
 
 dh = DataHandler{Float64}(df, input_cols=[:x1, :x2], output_cols=[:x3],
                           normalize_cols=[:x1, :x2],

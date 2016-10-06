@@ -58,6 +58,9 @@ type DataHandler{T} <: AbstractDH{T}
     and output (target) should be provided with keywords `input_cols` and `output_cols`
     respectively.  The constructor will randomly do a train-test split with test fraction
     `testfrac`.  
+
+    Note that currently `DataHandler` can't handle dataframes with null values, and
+    automatically drops all rows containing null values.
     """
     function DataHandler(df::DataFrame; testfrac::AbstractFloat=0.0, shuffle::Bool=false,
                          input_cols::Array{Symbol}=Symbol[], 
@@ -66,6 +69,8 @@ type DataHandler{T} <: AbstractDH{T}
                          assign::Bool=false,
                          userange::Bool=false)
         ndf = copy(df)
+        # TODO convert to all non-nullable arrays!!!
+        complete_cases!(ndf)
         o = new(ndf, input_cols, output_cols, normalize_cols)
         o.userange = userange
         split!(o, testfrac, shuffle=shuffle, assign=assign)

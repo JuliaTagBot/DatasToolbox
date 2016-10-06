@@ -1,115 +1,101 @@
 
 
 """
-    convertCol(df::DataFrame, col::Symbol, dtype::DataType)
+    convertPyColumn(pycol::PyObject)
 
-Converts a column, possibly containing python objects, to a column with eltype `dtype`.
-The column itself will be a `DataArray` with `NA` values inserted where Python
-`None`s are found.  Note that this isn't terribly efficient because it has to check
-for `None`s.
+Converts a column of a pandas array to a Julia `NullableArray`.
 """
-function convertCol(df::DataFrame, col::Symbol, dtype::DataType)
-    # return map(d -> convert(dtype, d), df[col])
-    pyNone = pybuiltin("None")
-    o = DataArray(Vector{dtype}(length(df[col])))
-    for i in 1:length(o)
-        if df[col][i] == pyNone
-            o[i] = NA
+function convertPyColumn(pycol::PyObject)::NullableArray
+    nptype = pycol[:dtype][:kind]
+    # list of numpy kinds can be found at 
+    # http://docs.scipy.org/doc/numpy/reference/arrays.dtypes.html
+    if nptype == "O"
+        o = NullableArray([x == nothing ? Nullable() : x for x in pycol])
+        return o
+    elseif nptype == "M"
+        (o = NullableArray(Nullable{DateTime}[isa(t, PyObject) ? Nullable() : t for t in
+                                               pycol]))
+        return o
+    else
+        return NullableArray(pycol[:values])
+    end
+end
+export convertPyColumn
+
+
+function _inferColumnType(col::NullableArray; max_elements::Integer=100)::DataType
+    for i in 1:max_elements
+        isnull(col) ? continue : nothing
+        thistype = typeof(get(col[i]))
+        thistype == PyObject ? continue : nothing
+        return thistype
+    end
+    return Any
+end
+
+
+function _fillNewCol!{T}(newcol::NullableArray{T}, df::DataFrame, col::Symbol)
+    for i in 1:length(newcol)
+        if isnull(df[i, col])
+            newcol[i] = Nullable()
         else
-            o[i] = convert(dtype, df[col][i])
+            newcol[i] = get(df[i, col])
         end
     end
-    return o
 end
-export convertCol
 
 
-# TODO for now just checks the first element of each column
 """
-    migrateTypes!(df::DataFrame)
+    fixColumnTypes!(df)
 
-Attempts to convert all columns of a dataframe to the proper type based on the Python
-types found in it.  
-**TODO** Right now this just checks the first elements in the column. 
+Check to see if the dataframe `df` has any columns of type `Any` and attempt to convert
+them to the proper types.  This can be called from `convertPyDF` with the option
+`fixtypes`.
 """
-function migrateTypes!(df::DataFrame)
-    @pyimport datetime
-    @pyimport decimal
+function fixColumnTypes!(df::DataFrame)
     for col in names(df)
-        isinstance = pybuiltin("isinstance")
-        pystr = pybuiltin("str")
-        if isinstance(df[1, col], pystr)
-            df[col] = convertCol(df, col, String)
-        # need to preserve the order of these because somehow date <: datetime
-        elseif isinstance(df[1, col], datetime.datetime)
-            df[col] = convertCol(df, col, DateTime)
-        elseif isinstance(df[1, col], datetime.date)
-            df[col] = convertCol(df, col, Date)
-        # consider removing this, it's obscure and probably shouldn't always be checked
-        elseif isinstance(df[1, col], decimal.Decimal)
-            df[col] = convertCol(df, col, Float32)
-        end
+        if eltype(eltype(df[col])) ≠ Any continue end
+        dtype = _inferColumnType(df[col])
+        # I can't find any way around getting into these stupid loops
+        newcol = NullableArray{dtype}(length(df[col]))
+        _fillNewCol!(newcol, df, col)
+        df[col] = newcol
     end
 end
-export migrateTypes!
+export fixColumnTypes!
 
 
 """
-Checks to see if the column is one of the types known to fuck up conversions.
-If so, makes the appropriate changes.  Note that columns can be integers.
+    convertPyDF(pydf[, fixtypes=true])
+
+Converts a pandas dataframe to a Julia one.  
+
+Note that it is difficult to infer the correct types of columns which contain references
+to Python objects.  If `fixtypes`, this will attempt to convert any column with eltype
+`Any` to the proper type.
 """
-function _fixBadPyConversions(pydf::PyObject, col::Union{AbstractString, Integer})
-    @pyimport numpy as np
-    pycol = get(pydf, col)
-    if np.dtype(pycol) == np.dtype("<M8[ns]")
-        # this should have no choice but to always return datetime
-        newcol = [dt for dt in pycol]
-        return newcol
-        # newcol = pycol[:astype]("O")
-        # return newcol[:values]
+function convertPyDF(pydf::PyObject; fixtypes::Bool=true)::DataFrame
+    df = DataFrame()
+    for col in pydf[:columns]
+        df[Symbol(col)] = convertPyColumn(get(pydf, col))
     end
-    # if not, just return the column as an array
-    return pycol[:values]
-end
-
-
-"""
-    convertPyDF(df::PyObject; migrate::Bool=true, fix_nones::Bool=true)
-
-Converts a pandas dataframe to a Julia dataframe.  If `migrate` is true this will try
-to properly assign types to columns.  If `fix_nones` is true, this will check for columns
-which have eltype `PyObject` and convert them to have eltype `Any`, replacing all Python
-`None`s with `NA`.
-"""
-function convertPyDF(df::PyObject; 
-                     migrate::Bool=true,
-                     fix_nones::Bool=true)::DataFrame
-    jdf = DataFrame()
-    for col in df[:columns]
-        jdf[Symbol(col)] = _fixBadPyConversions(df, col)
-    end
-    if migrate migrateTypes!(jdf) end
-    # attempts to fix columns which wound up badly converted because of nones
-    if fix_nones
-        for col in names(jdf)
-            if !(eltype(jdf[col]) == PyObject) continue end
-            fixPyNones!(Any, jdf, col)
-        end
-    end
-    return jdf
+    if fixtypes fixColumnTypes!(df) end
+    return df
 end
 export convertPyDF
 
 
 """
-    fixPyNones(dtype::DataType, a::DataArray)
+    fixPyNones(dtype, a)
 
-Attempts to convert a `DataArray` to have eltype `dtype` while replacing all Python
-`None`s with `NA`.
+Attempts to convert a `NullableArray` to have eltype `dtype` while replacing all Python
+`None`s with `Nullable`.
 """
-function fixPyNones(dtype::DataType, a::DataArray)
-    newa = @data([pyeval("x is None", x=x) ? NA : convert(dtype, x) for x in a])
-    return newa
+function fixPyNones(dtype::DataType, a::NullableArray)
+    # exit silently if the array can't possibly hold Nones
+    if !((eltype(a) == Any) | (eltype(a) == PyObject)) return end
+    pyNone = pybuiltin("None")
+    newa = NullableArray([x == pyNone ? Nullable() : convert(dtype, x) for x in a])
 end
 export fixPyNones
 
@@ -118,7 +104,7 @@ export fixPyNones
     fixPyNones!(dtype::DataType, df::DataFrame, col::Symbol)
 
 Attempts to convert a column of the dataframe to have eltype `dtype` while replacing all
-Python `None`s with `NA`.
+Python `None`s with `Nullable()`.
 """
 function fixPyNones!(dtype::DataType, df::DataFrame, col::Symbol)
     df[col] = fixPyNones(dtype, df[col])
@@ -131,7 +117,7 @@ export fixPyNones!
     fixPyNones!(df::DataFrame)
 
 Attempts to automatically convert all columns of a dataframe to have eltype `Any` while
-replacing all Python `None`s with `NA`.
+replacing all Python `None`s with `Nullable()`.
 """
 function fixPyNones!(df::DataFrame)
     for col in names(df)
@@ -144,22 +130,20 @@ export fixPyNones!
 
 
 """
-    convert(dtype::Union{Type{Int32}, Type{Int64}}, a::DataArray)
+    convert(dtype, a)
 
 This converts a column of floats that should have been ints, but got converted to
 floats because it has missing values which were converted to NaN's.
-The supplied `DataArray` should have eltype `Float32` or `Float64`.
+The supplied `NullableArray` should have eltype `Float32` or `Float64`.
 """
-function convert(dtype::Union{Type{Int32}, Type{Int64}}, a::DataArray{Float32, 1})
-    newa = @data([isnan(x) ? NA : convert(dtype, x) for x in a])
-    return newa
+function convert(dtype::Union{Type{Int32}, Type{Int64}}, a::NullableArray{Float32})
+    NullableArray([isnan(x) ? Nullable() : convert(dtype, x) for x in a])    
 end
 export convert
 
 
-function convert(dtype::Union{Type{Int32}, Type{Int64}}, a::DataArray{Float64, 1})
-    newa = @data([isnan(x) ? NA : convert(dtype, x) for x in a])
-    return newa
+function convert(dtype::Union{Type{Int32}, Type{Int64}}, a::NullableArray{Float64, 1})
+    newa = NullableArray([isnan(x) ? Nullable() : convert(dtype, x) for x in a])
 end
 
 
@@ -240,8 +224,8 @@ function numericalCategories(otype::DataType, A::Array)
     o = convert(Array{otype}, indexin(A, mapping))
     return o, mapping
 end
-# define for DataArray type
-numericalCategories(otype::DataType, A::DataArray) = numericalCategories(otype, 
+# define for NullableArray type
+numericalCategories(otype::DataType, A::NullableArray) = numericalCategories(otype, 
         convert(Array, A))
 export numericalCategories
 
@@ -320,29 +304,13 @@ export convertNulls!
 
 
 """
-    convertNulls{T}(A::DataArray{T}, newvalue::T)
+    convertNulls{T}(A, newvalue)
 
-Converts all null vlaues (NA's, NaN's and Nullable()) to a particular value.
+Converts all null vlaues (NaN's and Nullable()) to a particular value.
+This is a wrapper added for sake of naming consistency.
 """
-function convertNulls{T}(A::Vector{Nullable{T}}, newvalue::T)
-    newA = Vector{T}(length(A))
-    for i in 1:length(A)
-        if isnull(A[i])
-            newA[i] = newvalue
-        end
-    end
-    return newA
-end
-
-function convertNulls{T}(A::DataArray{Nullable{T}}, newvalue::T)
-    A = convert(Array, A, newvalue)
-    return convertNulls(A, newvalue)
-end
-
-function convertNulls{T}(A::DataArray{T}, newvalue::T)
-    A = convert(Array, A, newvalue)
-    convertNulls!(A, newvalue)
-    return DataArray(A)
+function convertNulls{T}(A::NullableArray{T}, newvalue::T)
+    convert(Array, A, newvalue)
 end
 export convertNulls
 
@@ -436,7 +404,8 @@ function pandas(df::DataFrame)::PyObject
     @pyimport pandas as pd
     pydf = pd.DataFrame()
     for col in names(df)
-        set!(pydf, string(col), df[col])
+        pycol = [isnull(x) ? nothing : get(x) for x in df[col]]
+        set!(pydf, string(col), pycol)
         # convert datetime to proper numpy type
         if eltype(df[col]) == DateTime
             set!(pydf, string(col), 
@@ -466,18 +435,43 @@ export constrainDF
 
 # TODO this should only be temporary!!!
 """
-    writeFeather(filename, df)
+    writePandasFeather(filename, df)
 
 Writes the dataframe `df` to a feather by first converting to python.
 Note that this is only a temporary solution while Feather.jl matures.
 
 Note that `feather` must be installed in Python3.
 """
-function writeFeather(filename::String, df::DataFrame)
+function writePandasFeather(filename::String, df::DataFrame)
     pydf = pandas(df)
     @pyimport feather as pyfeather
     pyfeather.write_dataframe(pydf, filename)
 end
-export writeFeather
+export writePandasFeather
+
+
+"""
+    makeTestDF(dtypes...; nrows=10^4)
+
+Creates a random dataframe with columns of types specified by `dtypes`.  This is useful
+for testing various dataframe related functionality.
+"""
+function makeTestDF(dtypes::DataType...; nrows::Integer=10^4)::DataFrame
+    df = DataFrame()
+    for (idx, dtype) in enumerate(dtypes)
+        col = Symbol(string(dtype)*string(idx))
+        if dtype <: Real
+            df[col] = rand(dtype, nrows)
+        elseif dtype <: AbstractString
+            df[col] = [randstring(rand(8:16)) for i in 1:nrows]
+        elseif dtype <: Dates.TimeType
+            df[col] = [dtype(now()) + Dates.Day(i) for i in 1:nrows]
+        elseif dtype <: Symbol
+            df[col] = [Symbol(randstring(rand(4:12))) for i in 1:nrows]
+        end
+    end
+    return df
+end
+export makeTestDF
 
 
