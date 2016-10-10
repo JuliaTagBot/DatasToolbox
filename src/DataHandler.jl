@@ -68,6 +68,7 @@ type DataHandler{T} <: AbstractDH{T}
                          normalize_cols::Array{Symbol}=Symbol[],
                          assign::Bool=false,
                          userange::Bool=false)
+        @assert sum(!complete_cases(df)) == 0 "DataHandler only accepts complete dataframes."
         ndf = copy(df)
         # TODO convert to all non-nullable arrays!!!
         complete_cases!(ndf)
@@ -103,11 +104,12 @@ function computeNormalizeParameters!{T}(dh::AbstractDH{T}; dataset::Symbol=:dfTr
     mu = Array{T, 1}(length(dh.colsNormalize))
     norm = Array{T, 1}(length(dh.colsNormalize))
     for (i, col) in enumerate(dh.colsNormalize)
-        mu[i] = mean(df[col])
+        dfcol = dropnull(df[col])
+        mu[i] = mean(dfcol)
         if dh.userange
-            norm[i] = maximum(df[col]) - minimum(df[col])
+            norm[i] = maximum(dfcol) - minimum(dfcol)
         else
-            norm[i] = std(df[col])
+            norm[i] = std(dfcol)
         end
     end
     dh.mu = mu
@@ -144,7 +146,8 @@ function normalize!{T}(dh::AbstractDH{T}; dataset::Symbol=:dfTrain)
     end
     df = getfield(dh, dataset)
     for (i, col) in enumerate(dh.colsNormalize)
-        df[col] = (df[col] - dh.mu[i])./dh.norm[i]
+        dfcol = dropnull(df[col])
+        dfcol = (dfcol - dh.mu[i])./dh.norm[i]
     end
     return
 end
@@ -334,7 +337,7 @@ function _replaceExprColNames!(expr::Expr, dh::AbstractDH, dfname::Symbol)
             _replaceExprColNames!(expr.args[i], dh, dfname)
         elseif isa(arg, Symbol) && (arg ∈ names(getfield(dh, dfname)))
             argsymb = Expr(:quote, arg)
-            expr.args[i] = :($dh.$dfname[$argsymb]) 
+            expr.args[i] = :(dropnull($dh.$dfname[$argsymb])) 
         end
     end
     return expr
@@ -426,6 +429,7 @@ end
 export split!
 
 
+# TODO look at DataFramesMeta to see how to do this properly
 """
     @split! dh constraint
 

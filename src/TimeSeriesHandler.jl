@@ -189,7 +189,7 @@ given (τ₀) will be in the training set, while all those with τ > τ₀ will 
 the test set.
 """
 function split!(dh::TimeSeriesHandler, τ₀::Integer; assign::Bool=true, sort::Bool=true)
-    constr = dh.df[dh.timeindex] .≤ τ₀
+    constr = dropnull(dh.df[dh.timeindex]) .≤ τ₀
     dfTrain = dh.df[constr, :]
     dfTest = dh.df[!constr, :]
     if !isempty(dfTrain)
@@ -216,7 +216,7 @@ course greater than n_sequences.
 """
 function splitByNSequences!(dh::TimeSeriesHandler, n_sequences::Integer;
                             assign::Bool=true, sort::Bool=true)
-    τ_max = maximum(dh.df[:, dh.timeindex])
+    τ_max = maximum(dropnull(dh.df[:, dh.timeindex]))
     nτ = n_sequences*dh.seq_length
     τ₀ = τ_max - nτ
     split!(dh, τ₀, assign=assign, sort=sort)

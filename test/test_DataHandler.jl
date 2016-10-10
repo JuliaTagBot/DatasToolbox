@@ -9,8 +9,12 @@ dh = DataHandler{Float64}(df, input_cols=[:x1, :x2], output_cols=[:x3],
                           testfrac=0.1, shuffle=true, userange=true)
 
 function test1!(dh)
-    @split! dh (x1 .≥ 50.0) | (x2 .< 20.0)
+    @split! dh (x1 .≥ 0.5) | (x2 .< 0.3)
 end
 
 test1!(dh)
+
+assign!(dh)
+
+X_train, y_train = getTrainData(dh)
 

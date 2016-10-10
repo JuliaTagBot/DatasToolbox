@@ -4,6 +4,7 @@ module DatasToolbox
 
 
 using DataFrames
+using DataFramesMeta
 using PyCall
 
 # explicit imports for overriding base
