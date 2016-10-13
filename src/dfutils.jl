@@ -65,6 +65,8 @@ end
 export fixColumnTypes!
 
 
+# TODO this still has the fix_nones option for legacy support, remove when
+# DataFrames with NullableArrays is in full release
 """
     convertPyDF(pydf[, fixtypes=true])
 
@@ -74,7 +76,8 @@ Note that it is difficult to infer the correct types of columns which contain re
 to Python objects.  If `fixtypes`, this will attempt to convert any column with eltype
 `Any` to the proper type.
 """
-function convertPyDF(pydf::PyObject; fixtypes::Bool=true)::DataFrame
+function convertPyDF(pydf::PyObject; fixtypes::Bool=true,
+                     fix_nones::Bool=false)::DataFrame
     df = DataFrame()
     for col in pydf[:columns]
         df[Symbol(col)] = convertPyColumn(get(pydf, col))
@@ -156,17 +159,15 @@ attempt to convert the object to a Julia dataframe with the flags
 `migrate` and `fix_nones` (see `convertPyDF`).
 """
 function unpickle(filename::String)::PyObject
-    @pyimport pickle as pypickle
     f = pyeval("open('$filename', 'rb')")
-    pyobj = pypickle.load(f)
+    pyobj = PyPickle[:load](f)
 end
 
 function unpickle(dtype::Type{DataFrame}, filename::AbstractString;
                   migrate::Bool=true,
                   fix_nones::Bool=true)::DataFrame
     f = pyeval("open('$filename', 'rb')")
-    @pyimport pickle as pypickle
-    pydf = pypickle.load(f)
+    pydf = PyPickle[:load](f)
     df = convertPyDF(pydf, migrate=migrate, fix_nones=fix_nones)
 end
 export unpickle
@@ -180,17 +181,15 @@ the python pickle format.  If the object provided is a `DataFrame`,
 this will first convert it to a pandas dataframe.
 """
 function pickle(filename::String, object::Any)
-    @pyimport pickle as pypickle
     pyobject = PyObject(object)
     f = pyeval("open('$filename', 'wb')")
-    pypickle.dump(pyobject, f)
+    PyPickle[:dump](pyobject, f)
 end
 
 function pickle(filename::String, df::DataFrame)
-    @pyimport pickle as pypickle
     pydf = pandas(df)
     f = pyeval("open('$filename', 'wb')")
-    pypickle.dump(pydf, f)
+    PyPickle[:dump](pydf, f)
 end
 export pickle
 
@@ -401,8 +400,7 @@ export applyCatConstraints
 Convert a dataframe to a pandas pyobject.
 """
 function pandas(df::DataFrame)::PyObject
-    @pyimport pandas as pd
-    pydf = pd.DataFrame()
+    pydf = PyPandas[:DataFrame]()
     for col in names(df)
         pycol = [isnull(x) ? nothing : get(x) for x in df[col]]
         set!(pydf, string(col), pycol)
@@ -444,8 +442,7 @@ Note that `feather` must be installed in Python3.
 """
 function writePandasFeather(filename::String, df::DataFrame)
     pydf = pandas(df)
-    @pyimport feather as pyfeather
-    pyfeather.write_dataframe(pydf, filename)
+    PyFeather[:write_dataframe](pydf, filename)
 end
 export writePandasFeather
 
@@ -473,5 +470,39 @@ function makeTestDF(dtypes::DataType...; nrows::Integer=10^4)::DataFrame
     return df
 end
 export makeTestDF
+
+
+"""
+    featherWrite(filename, df)
+
+A wrapper for writing dataframes to feather files.  To be used while Feather.jl package
+is in development.
+"""
+function featherWrite(filename::AbstractString, df::DataFrame)::Void
+    Feather.write(filename, df)
+    return nothing
+end
+export featherWrite
+
+
+"""
+    featherRead(filename)
+
+A wrapper for reading dataframes which are saved in feather files.  To be used while the
+Feather.jl package is in development.
+"""
+function featherRead(filename::AbstractString)::DataFrame
+    bad_df = Feather.read(filename)
+    df = DataFrame()
+    for col in names(bad_df)
+        if eltype(bad_df[col]) == Nullable{Feather.WeakRefString{UInt8}}
+            df[col] = convert(Array{String}, bad_df[col])
+        else
+            df[col] = bad_df[col]
+        end
+    end
+    return df
+end
+export featherRead
 
 
