@@ -415,6 +415,8 @@ end
 export pandas
 
 
+# TODO this is fucked up!!!
+#=
 """
     constrainDF(df, constraints)
 
@@ -422,11 +424,25 @@ Returns a constrained dataframe.  For each key `k` in `constraints`, only the el
 of `df` with `df[i, k] ∈ constraints[k]` will be present in the constrained dataframe.
 """
 function constrainDF(df::DataFrame, constraints::Dict)::DataFrame
-    inrow = Bool[true for i in 1:size(df)[1]]
+    inrow = Bool[true for i in 1:size(df, 1)]
     for (col, values) in constraints
-        inrow &= convert(BitArray, map(x -> x ∈ values, df[col]))
+        inrow &= map(df[col]) do x
+            isnull(x) ? false : get(x) ∈ values
+        end
     end
     df = df[inrow, :]
+end
+=#
+function constrainDF(df::DataFrame, constraints::Dict)::DataFrame
+    inrow = ones(Bool, size(df, 1))
+    for (col, values) in constraints
+        for i in 1:length(inrow)
+            if !isnull(df[i, col])
+                inrow[i] &= get(df[i, col]) ∈ values 
+            end
+        end
+    end
+    df[inrow, :]
 end
 export constrainDF
 
@@ -473,12 +489,22 @@ export makeTestDF
 
 
 """
-    featherWrite(filename, df)
+    featherWrite(filename, df[, overwrite=false])
 
 A wrapper for writing dataframes to feather files.  To be used while Feather.jl package
 is in development.
+
+If `overwrite`, this will delete the existing file first (an extra step taken to avoid some
+strange bugs).
 """
-function featherWrite(filename::AbstractString, df::DataFrame)::Void
+function featherWrite(filename::AbstractString, df::DataFrame;
+                      overwrite::Bool=false)::Void
+    if isfile(filename)
+        if !overwrite
+            throw(SystemError("File already exists.  Use overwrite=true."))
+        end
+        rm(filename)     
+    end
     Feather.write(filename, df)
     return nothing
 end
