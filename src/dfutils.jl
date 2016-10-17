@@ -415,24 +415,22 @@ end
 export pandas
 
 
-# TODO this is fucked up!!!
-#=
+# TODO there were some bizarre errors when doing this with map, may be inefficient
 """
     constrainDF(df, constraints)
+    constrainDF(df, kwargs...)
 
 Returns a constrained dataframe.  For each key `k` in `constraints`, only the elements
 of `df` with `df[i, k] ∈ constraints[k]` will be present in the constrained dataframe.
+
+Alternatively, one can provide the columns and lists of acceptable arguments as kewords
+of `constrainDF`.
+
+Ideally, the values should be provided as Arrays or other iterables, but in many cases
+single values will work.
+
+Note that this will be replaced by DataFramesMeta once it is more mature.
 """
-function constrainDF(df::DataFrame, constraints::Dict)::DataFrame
-    inrow = Bool[true for i in 1:size(df, 1)]
-    for (col, values) in constraints
-        inrow &= map(df[col]) do x
-            isnull(x) ? false : get(x) ∈ values
-        end
-    end
-    df = df[inrow, :]
-end
-=#
 function constrainDF(df::DataFrame, constraints::Dict)::DataFrame
     inrow = ones(Bool, size(df, 1))
     for (col, values) in constraints
@@ -443,6 +441,12 @@ function constrainDF(df::DataFrame, constraints::Dict)::DataFrame
         end
     end
     df[inrow, :]
+end
+
+
+function constrainDF(df::DataFrame; kwargs...)
+    dict = Dict(kwargs)
+    constrainDF(df, dict)
 end
 export constrainDF
 

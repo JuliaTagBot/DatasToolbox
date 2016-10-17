@@ -63,3 +63,35 @@ end
 export @pyslice
 
 
+"""
+    getNormedHistogramData(X)
+
+Very annoyingly Gadfly does not yet support normed histograms.
+
+This function returns an ordered pair of vectors which can be 
+fed to gadfly to create a normed histogram.  If the output
+is `m, w` one can do
+`plot(x=m, y=w, Geom.bar)` to create a histogram.
+"""
+function getNormedHistogramData{T <: Real}(X::Vector{T}; 
+                                           nbins::Integer=StatsBase.sturges(length(X)))
+    h = fit(Histogram, X, nbins=nbins)
+    edges = h.edges[1]
+    midpoints = Vector{Float64}(length(edges)-1) 
+    for i in 1:length(midpoints)
+        midpoints[i] = (edges[i+1] + edges[i])/2.0
+    end
+    width = midpoints[2] - midpoints[1]
+    weights = h.weights./(sum(h.weights)*width)
+    midpoints, weights
+end
+
+# NullableArrays version, just ignores nulls
+function getNormedHistogramData{T <: Real}(X::NullableArray{T, 1};
+                                           nbins::Integer=StatsBase.sturges(length(X)))
+    X = dropnull(X)
+    getNormedHistogramData(X, nbins=nbins)
+end
+export getNormedHistogramData
+
+
