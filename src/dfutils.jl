@@ -76,8 +76,7 @@ Note that it is difficult to infer the correct types of columns which contain re
 to Python objects.  If `fixtypes`, this will attempt to convert any column with eltype
 `Any` to the proper type.
 """
-function convertPyDF(pydf::PyObject; fixtypes::Bool=true,
-                     fix_nones::Bool=false)::DataFrame
+function convertPyDF(pydf::PyObject; fixtypes::Bool=true)::DataFrame
     df = DataFrame()
     for col in pydf[:columns]
         df[Symbol(col)] = convertPyColumn(get(pydf, col))
@@ -151,12 +150,12 @@ end
 
 
 """
-    unpickle([dtype,] filename[, migrate, fix_nones])
+    unpickle([dtype,] filename[, fixtypes=true])
 
 Deserializes a python pickle file and returns the object it contains.
 Additionally, if `DataFrame` is given as the first argument, will
-attempt to convert the object to a Julia dataframe with the flags
-`migrate` and `fix_nones` (see `convertPyDF`).
+attempt to convert the object to a Julia dataframe with the flag
+`fixtypes` (see `convertPyDF`).
 """
 function unpickle(filename::String)::PyObject
     f = pyeval("open('$filename', 'rb')")
@@ -164,11 +163,10 @@ function unpickle(filename::String)::PyObject
 end
 
 function unpickle(dtype::Type{DataFrame}, filename::AbstractString;
-                  migrate::Bool=true,
-                  fix_nones::Bool=true)::DataFrame
+                  fixtypes::Bool=true)::DataFrame
     f = pyeval("open('$filename', 'rb')")
     pydf = PyPickle[:load](f)
-    df = convertPyDF(pydf, migrate=migrate, fix_nones=fix_nones)
+    df = convertPyDF(pydf, fixtypes=fixtypes)
 end
 export unpickle
 
@@ -415,7 +413,7 @@ end
 export pandas
 
 
-# TODO there were some bizarre errors when doing this with map, may be inefficient
+# TODO this should be removed once DataFramesMeta is ready
 """
     constrainDF(df, constraints)
     constrainDF(df, kwargs...)
@@ -429,7 +427,7 @@ of `constrainDF`.
 Ideally, the values should be provided as Arrays or other iterables, but in many cases
 single values will work.
 
-Note that this will be replaced by DataFramesMeta once it is more mature.
+**Note** that this will be replaced by DataFramesMeta once it is more mature.
 """
 function constrainDF(df::DataFrame, constraints::Dict)::DataFrame
     inrow = ones(Bool, size(df, 1))
@@ -437,18 +435,43 @@ function constrainDF(df::DataFrame, constraints::Dict)::DataFrame
         for i in 1:length(inrow)
             if !isnull(df[i, col])
                 inrow[i] &= get(df[i, col]) ∈ values 
+            else
+                inrow[i] = false
             end
         end
     end
     df[inrow, :]
 end
 
-
-function constrainDF(df::DataFrame; kwargs...)
+function constrainDF(df::DataFrame; kwargs...)::DataFrame
     dict = Dict(kwargs)
     constrainDF(df, dict)
 end
 export constrainDF
+
+
+function constrainDFRange(df::DataFrame, constraints::Dict)::DataFrame
+    inrange = ones(Bool, size(df, 1))
+    for (col, values) in constraints
+        @assert length(values) == 2
+        for i in 1:length(inrange)
+            if !isnull(df[i, col])
+                inrange[i] &= values[1] ≤ get(df[i, col]) ≤ values[2]
+            else 
+                inrange[i] = false
+            end
+        end
+    end
+    df[inrange, :]
+end
+
+function constrainDFRange(df::DataFrame; kwargs...)::DataFrame
+    dict = Dict(kwargs)
+    constrainDFRange(df, dict)
+end
+export constrainDFRange
+
+
 
 
 # TODO this should only be temporary!!!
@@ -473,7 +496,8 @@ export writePandasFeather
 Creates a random dataframe with columns of types specified by `dtypes`.  This is useful
 for testing various dataframe related functionality.
 """
-function makeTestDF(dtypes::DataType...; nrows::Integer=10^4)::DataFrame
+function makeTestDF(dtypes::DataType...; nrows::Integer=10^4,
+                    names::Vector{Symbol}=Symbol[])::DataFrame
     df = DataFrame()
     for (idx, dtype) in enumerate(dtypes)
         col = Symbol(string(dtype)*string(idx))
@@ -487,9 +511,34 @@ function makeTestDF(dtypes::DataType...; nrows::Integer=10^4)::DataFrame
             df[col] = [Symbol(randstring(rand(4:12))) for i in 1:nrows]
         end
     end
+    if length(names) > 0
+        names!(df, names)
+    end
     return df
 end
 export makeTestDF
+
+
+"""
+    nans2nulls(col)
+    nans2nulls(df, colname)
+
+Converts all `NaN`s appearing in the column to `Nullable()`.  The return
+type is `NullableArray`, even if the original type of the column is not.
+"""
+function nans2nulls(col::NullableArray)
+    map(x -> isnan(x) ? Nullable() : x, col, lift=true)
+end
+
+function nans2nulls(col::Vector)
+    col = convert(NullableArray, col)
+    nans2nulls(col)
+end
+
+function nans2nulls(df::DataFrame, col::Symbol)
+    nans2nulls(df[col])
+end
+export nans2nulls
 
 
 """
