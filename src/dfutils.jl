@@ -97,7 +97,7 @@ function fixPyNones(dtype::DataType, a::NullableArray)
     # exit silently if the array can't possibly hold Nones
     if !((eltype(a) == Any) | (eltype(a) == PyObject)) return end
     pyNone = pybuiltin("None")
-    newa = NullableArray([x == pyNone ? Nullable() : convert(dtype, x) for x in a])
+    newa = NullableArray(x == pyNone ? Nullable() : convert(dtype, x) for x in a)
 end
 export fixPyNones
 
@@ -415,21 +415,21 @@ export pandas
 
 # TODO this should be removed once DataFramesMeta is ready
 """
-    constrainDF(df, constraints)
-    constrainDF(df, kwargs...)
+    constrain(df, constraints)
+    constrain(df, kwargs...)
 
 Returns a constrained dataframe.  For each key `k` in `constraints`, only the elements
 of `df` with `df[i, k] ∈ constraints[k]` will be present in the constrained dataframe.
 
 Alternatively, one can provide the columns and lists of acceptable arguments as kewords
-of `constrainDF`.
+of `constrain`.
 
 Ideally, the values should be provided as Arrays or other iterables, but in many cases
 single values will work.
 
 **Note** that this will be replaced by DataFramesMeta once it is more mature.
 """
-function constrainDF(df::DataFrame, constraints::Dict)::DataFrame
+function constrain(df::DataFrame, constraints::Dict)::DataFrame
     inrow = ones(Bool, size(df, 1))
     for (col, values) in constraints
         for i in 1:length(inrow)
@@ -443,14 +443,14 @@ function constrainDF(df::DataFrame, constraints::Dict)::DataFrame
     df[inrow, :]
 end
 
-function constrainDF(df::DataFrame; kwargs...)::DataFrame
+function constrain(df::DataFrame; kwargs...)::DataFrame
     dict = Dict(kwargs)
-    constrainDF(df, dict)
+    constrain(df, dict)
 end
-export constrainDF
+export constrain
 
 
-function constrainDFRange(df::DataFrame, constraints::Dict)::DataFrame
+function constrainRange(df::DataFrame, constraints::Dict)::DataFrame
     inrange = ones(Bool, size(df, 1))
     for (col, values) in constraints
         @assert length(values) == 2
@@ -465,11 +465,11 @@ function constrainDFRange(df::DataFrame, constraints::Dict)::DataFrame
     df[inrange, :]
 end
 
-function constrainDFRange(df::DataFrame; kwargs...)::DataFrame
+function constrainRange(df::DataFrame; kwargs...)::DataFrame
     dict = Dict(kwargs)
-    constrainDFRange(df, dict)
+    constrainRange(df, dict)
 end
-export constrainDFRange
+export constrainRange
 
 
 
@@ -526,16 +526,23 @@ export makeTestDF
 Converts all `NaN`s appearing in the column to `Nullable()`.  The return
 type is `NullableArray`, even if the original type of the column is not.
 """
-function nans2nulls(col::NullableArray)
-    map(x -> isnan(x) ? Nullable() : x, col, lift=true)
+function nans2nulls{T}(col::NullableArray{T})::NullableArray
+    # this is being done without lift because of bugs in NullableArrays
+    # map(x -> (isnan(x) ? Nullable{T}() : x), col, lift=true)
+    map(col) do x
+        if !isnull(x) && isnan(get(x))
+            return Nullable{T}()
+        end
+        return x
+    end
 end
 
-function nans2nulls(col::Vector)
+function nans2nulls(col::Vector)::NullableArray
     col = convert(NullableArray, col)
     nans2nulls(col)
 end
 
-function nans2nulls(df::DataFrame, col::Symbol)
+function nans2nulls(df::DataFrame, col::Symbol)::NullableArray
     nans2nulls(df[col])
 end
 export nans2nulls
