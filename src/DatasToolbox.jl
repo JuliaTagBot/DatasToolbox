@@ -14,6 +14,7 @@ import Base.deserialize
 import Base.shuffle!
 import Base.convert
 import Base.normalize!
+import Base.Dict
 
 # the following are python imports that get used in various places
 const PyPickle = PyNULL()
