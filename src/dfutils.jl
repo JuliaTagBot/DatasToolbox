@@ -582,7 +582,7 @@ function featherRead(filename::AbstractString)::DataFrame
     df = DataFrame()
     for col in names(bad_df)
         if eltype(bad_df[col]) == Nullable{Feather.WeakRefString{UInt8}}
-            df[col] = convert(Array{String}, bad_df[col])
+            df[col] = convert(NullableArray{String}, bad_df[col])
         else
             df[col] = bad_df[col]
         end
