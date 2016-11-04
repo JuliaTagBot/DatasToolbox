@@ -95,3 +95,18 @@ end
 export getNormedHistogramData
 
 
+"""
+    infast(x, collection)
+
+Checks whether the object `x` is in `collection`. This is done efficiently by creating
+hashes for the objects in `collection`.  This should only be used if `collection` is
+large, as there is overhead in hashing and allocating.
+"""
+function infast{T}(x::T, collection::Vector{T})
+    # not sure if this is the most efficient way to create the hash
+    dict = Dict{T, Void}(c=>nothing for c ∈ collection)
+    x ∈ keys(dict)
+end
+export infast
+
+

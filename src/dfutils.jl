@@ -13,8 +13,11 @@ function convertPyColumn(pycol::PyObject)::NullableArray
         o = NullableArray([x == nothing ? Nullable() : x for x in pycol])
         return o
     elseif nptype == "M"
-        (o = NullableArray(Nullable{DateTime}[isa(t, PyObject) ? Nullable() : t for t in
-                                               pycol]))
+        # doubt there are subtle efficiency differences between these, but it's possible
+        o = NullableArray{DateTime}(
+            [isa(t, PyObject) ? Nullable{DateTime}() : Nullable{DateTime}(t) for t in pycol])
+        # (o = NullableArray(Nullable{DateTime}[isa(t, PyObject) ? Nullable() : t for t in
+        #                                        pycol]))
         return o
     else
         return NullableArray(pycol[:values])
@@ -413,81 +416,59 @@ end
 export pandas
 
 
-# TODO this should be removed once DataFramesMeta is ready
-"""
-    constrain(df, constraints)
-    constrain(df, kwargs...)
-
-Returns a constrained dataframe.  For each key `k` in `constraints`, only the elements
-of `df` with `df[i, k] ∈ constraints[k]` will be present in the constrained dataframe.
-
-Alternatively, one can provide the columns and lists of acceptable arguments as kewords
-of `constrain`.
-
-Ideally, the values should be provided as Arrays or other iterables, but in many cases
-single values will work.
-
-**Note** that this will be replaced by DataFramesMeta once it is more mature.
-"""
-function constrain(df::DataFrame, constraints::Dict)::DataFrame
-    inrow = ones(Bool, size(df, 1))
-    for (col, values) in constraints
-        for i in 1:length(inrow)
-            if !isnull(df[i, col])
-                inrow[i] &= get(df[i, col]) ∈ values 
-            else
-                inrow[i] = false
-            end
+# helper function for constrain
+function _colconstraints!{T}(col::NullableVector{T}, bfunc::Function, keep::Vector{Bool})
+    for i ∈ 1:length(keep)
+        if !isnull(col[i])
+            keep[i] &= bfunc(get(col[i]))
+        else
+            keep[i] = false
         end
     end
-    df[inrow, :]
+    keep
 end
 
-function constrain(df::DataFrame; kwargs...)::DataFrame
-    dict = Dict(kwargs)
+"""
     constrain(df, dict)
+    constrain(df, kwargs...)
+
+Returns a subset of the dataframe `df` for which the column `key` satisfies 
+`value(df[i, key]) == true`.  Where `(key, value)` are the pairs in `dict`.  
+Alternatively one can use keyword arguments instead of a `Dict`.
+"""
+function constrain{K<:Symbol, V<:Function}(df::DataFrame, constraints::Dict{K, V})::DataFrame
+    keep = ones(Bool, size(df, 1))
+    for (col, bfunc) ∈ constraints
+        _colconstraints!(df[col], bfunc, keep)
+    end
+    df[keep, :]
+end
+
+function constrain{K, V<:Array}(df::DataFrame, constraints::Dict{K, V})::DataFrame
+    newdict = Dict(k=>(x -> x ∈ v) for (k, v) ∈ constraints)
+    constrain(df, newdict)
+end
+
+function constrain(df::DataFrame; kwargs...)
+    constrain(df, Dict(kwargs))
 end
 export constrain
 
 
-function constrainRange(df::DataFrame, constraints::Dict)::DataFrame
-    inrange = ones(Bool, size(df, 1))
-    for (col, values) in constraints
-        @assert length(values) == 2
-        for i in 1:length(inrange)
-            if !isnull(df[i, col])
-                inrange[i] &= values[1] ≤ get(df[i, col]) ≤ values[2]
-            else 
-                inrange[i] = false
-            end
+# TODO this is terrible. fix. (also only one column at a time)
+macro constrain(df, expr)
+    colname = Symbol[:nothing]
+    newname = gensym()
+    for (idx, a) ∈ enumerate(expr.args)
+        if isa(a, Expr) && a.head == :quote
+            colname[1] = a.args[1]
+            expr.args[idx] = newname
         end
     end
-    df[inrange, :]
+    cquote = Meta.quot(colname[1])
+    esc(:(constrain($df, Dict($cquote=>($newname -> $expr)))))
 end
-
-function constrainRange(df::DataFrame; kwargs...)::DataFrame
-    dict = Dict(kwargs)
-    constrainRange(df, dict)
-end
-export constrainRange
-
-
-
-
-# TODO this should only be temporary!!!
-"""
-    writePandasFeather(filename, df)
-
-Writes the dataframe `df` to a feather by first converting to python.
-Note that this is only a temporary solution while Feather.jl matures.
-
-Note that `feather` must be installed in Python3.
-"""
-function writePandasFeather(filename::String, df::DataFrame)
-    pydf = pandas(df)
-    PyFeather[:write_dataframe](pydf, filename)
-end
-export writePandasFeather
+export @constrain
 
 
 """
@@ -561,6 +542,7 @@ function featherWrite(filename::AbstractString, df::DataFrame;
                       overwrite::Bool=false)::Void
     if isfile(filename)
         if !overwrite
+            # TODO why is this not printing the string correctly
             throw(SystemError("File already exists.  Use overwrite=true."))
         end
         rm(filename)     
@@ -630,5 +612,44 @@ function Dict(df::DataFrame, keycol::Symbol, valcol::Symbol)::Dict
 end
 export Dict
 
+
+"""
+    getCategoryVector(A, vals[, dtype])
+
+Get a vector which is 1 for each `a ∈ A` that satisfies `a ∈ vals`, and 0 otherwise.
+If `A` is a `NullableVector`, any null elements will be mapped to 0.
+
+Optionally, one can specify the datatype of the output vector.
+"""
+function getCategoryVector{T, U}(A::Vector{T}, vals::Vector{T}, ::Type{U}=Int64)
+    # this is for efficiency
+    valsdict = Dict{T, Void}(v=>nothing for v ∈ vals)
+    Vector{U}([a ∈ keys(valsdict) for a ∈ A])
+end
+
+function getCategoryVector{T, U}(A::NullableVector{T}, vals::Vector{T}, ::Type{U}=Int64)
+    # this is for efficiency
+    valsdict = Dict{T, Void}(v=>nothing for v ∈ vals)
+    o = map(a -> a ∈ keys(valsdict), A, lift=true)
+    # these nested converts are the result of incomplete NullableArrays interface
+    convert(Array{U}, convert(Array, o, 0))
+end
+
+function getCategoryVector{T, U}(A::Vector{T}, val::T, ::Type{U}=Int64)
+    getCategoryVector(A, [val], U)
+end
+
+function getCategoryVector{T, U}(A::NullableVector{T}, val::T, ::Type{U}=Int64)
+    getCategoryVector(A, [val], U)
+end
+
+function getCategoryVector{U}(df::DataFrame, col::Symbol, vals::Vector, ::Type{U}=Int64)
+    getCategoryVector(df[col], vals, U)
+end
+
+function getCategoryVector{U}(df::DataFrame, col::Symbol, val, ::Type{U}=Int64)
+    getCategoryVector(df[col], [val], U)
+end
+export getCategoryVector
 
 
