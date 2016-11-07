@@ -429,6 +429,28 @@ function _colconstraints!{T}(col::NullableVector{T}, bfunc::Function, keep::Vect
 end
 
 
+# this is for fixing slowness due to bad dispatching
+# performance is better, but it's still slow
+function _dispatchConstrainFunc!(f::Function, mask::Vector{Bool},
+                                 keep::BitArray, cols::NullableVector...)
+    ncols = length(cols)
+    # for some reason this completely fixes the performance issues
+    # still don't completely understand why
+    get_idx(i, j) = get(cols[j][i])
+    get_args(i) = (get_idx(i, j) for j ∈ 1:ncols)
+    # all arg cols are same length
+    for i ∈ 1:length(keep)
+        if !mask[i] 
+            keep[i] = false
+        else
+            # this is inexplicably slow
+            # note that this is even true for the generator alone; not a dispatch issue
+            # keep[i] = f((get(col[i]) for col ∈ cols)...)
+            keep[i] = f(get_args(i)...)
+        end
+    end
+end
+
 """
     constrain(df, dict)
     constrain(df, kwargs...)
@@ -459,7 +481,7 @@ function constrain(df::DataFrame; kwargs...)
 end
 
 # this is the version used by the macro, this version only for NullableArrays
-function constrain(df, cols::Vector{Symbol}, f::Function)
+function constrain_OLD(df::DataFrame, cols::Vector{Symbol}, f::Function)
     keep = BitArray(size(df, 1)) 
     for i ∈ 1:length(keep)
         # TODO is this efficient?  test, replace with generator function
@@ -472,6 +494,12 @@ function constrain(df, cols::Vector{Symbol}, f::Function)
             keep[i] = f(convert(Array, row)...)
         end
     end
+    df[keep, :]
+end
+
+function constrain(df::DataFrame, cols::Vector{Symbol}, f::Function)
+    keep = BitArray(size(df, 1))
+    _dispatchConstrainFunc!(f, complete_cases(df), keep, (df[col] for col ∈ cols)...)
     df[keep, :]
 end
 export constrain
@@ -495,6 +523,7 @@ function _checkConstraintExpr!(expr::Expr, dict::Dict)
     end
 end
 
+# TODO this is still having performance issues
 """
     @constrain(df, expr)
 

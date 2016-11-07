@@ -1,18 +1,26 @@
 using DataFrames
 using DatasToolbox
 
-df = DataFrame(A=1:2:20, B=5:14)
+const NROWS = 5*10^6
 
-const M = 5
+df = DataFrame(A=rand(NROWS), B=rand(1:100, NROWS))
+
+const M = 0.5
+
+# testfunc(a, b) = a < M && b % 3 == 0
+# testfunc(a) = a < M
+
+# @time ocdf = DatasToolbox.constrain_OLD(df, [:A, :B], testfunc)
+# @time cdf = constrain(df, [:A, :B], testfunc)
 
 dict = Dict()
-expr = :((:A .< 10) && (:B % 2 == 0))
+expr = :((:A .< M) && (:B % 3 .== 0))
 DatasToolbox._checkConstraintExpr!(expr, dict)
 
 
-mac = macroexpand(:(@constrain(df, (:A .< 10) && (:B % 2 == 0))))
+mac = macroexpand(:(@constrain(df, (:A .< M) && (:B % 3 .== 0))))
 
-cdf = @constrain(df, (:A .< 10) && (:B % 2 == 0))
+@time cdf = @constrain(df, (:A .< M) && (:B % 3 .== 0))
 
-
+@time ccdf = constrain(df, A=(a -> a < M), B=(b -> b % 3 == 0))
 
