@@ -428,13 +428,18 @@ function _colconstraints!{T}(col::NullableVector{T}, bfunc::Function, keep::Vect
     keep
 end
 
+
 """
     constrain(df, dict)
     constrain(df, kwargs...)
+    constrain(df, cols, func)
 
 Returns a subset of the dataframe `df` for which the column `key` satisfies 
 `value(df[i, key]) == true`.  Where `(key, value)` are the pairs in `dict`.  
 Alternatively one can use keyword arguments instead of a `Dict`.
+
+Also, one can pass a function the arguments of which are elements of columns specified
+by `cols`.
 """
 function constrain{K<:Symbol, V<:Function}(df::DataFrame, constraints::Dict{K, V})::DataFrame
     keep = ones(Bool, size(df, 1))
@@ -452,21 +457,65 @@ end
 function constrain(df::DataFrame; kwargs...)
     constrain(df, Dict(kwargs))
 end
+
+# this is the version used by the macro, this version only for NullableArrays
+function constrain(df, cols::Vector{Symbol}, f::Function)
+    keep = BitArray(size(df, 1)) 
+    for i ∈ 1:length(keep)
+        # TODO is this efficient?  test, replace with generator function
+        # the ellipses operator seems to work ok here
+        row = df[i, cols]
+        if !complete_cases(row)[1]
+            # we never keep the nulls
+            keep[i] = false
+        else
+            keep[i] = f(convert(Array, row)...)
+        end
+    end
+    df[keep, :]
+end
 export constrain
 
 
-# TODO this is terrible. fix. (also only one column at a time)
-macro constrain(df, expr)
-    colname = Symbol[:nothing]
-    newname = gensym()
-    for (idx, a) ∈ enumerate(expr.args)
-        if isa(a, Expr) && a.head == :quote
-            colname[1] = a.args[1]
-            expr.args[idx] = newname
+# this is a helper function to @constrain
+function _checkConstraintExpr!(expr::Expr, dict::Dict)
+    # the dictionary keys are the column names (as :(:col)) and the values are the symbols
+    for (idx, arg) ∈ enumerate(expr.args)
+        if isa(arg, QuoteNode)
+            newsym = gensym()
+            dict[Meta.quot(arg.value)] = newsym  
+            expr.args[idx] = newsym
+        elseif  isa(arg, Expr) && arg.head == :quote
+            newsym = gensym()
+            dict[Meta.quot(arg.args[1])] = newsym
+            expr.args[idx] = newsym 
+        elseif isa(arg, Expr)
+            _checkConstraintExpr!(expr.args[idx], dict)
         end
     end
-    cquote = Meta.quot(colname[1])
-    esc(:(constrain($df, Dict($cquote=>($newname -> $expr)))))
+end
+
+"""
+    @constrain(df, expr)
+
+Constrains the dataframe to rows for which `expr` evaluates to `true`.  `expr` should
+specify columns with column names written as symbols.  For example, to do `(a ∈ A) > M`
+one should write `:A .> M`.
+"""
+macro constrain(df, expr)
+    dict = Dict()
+    _checkConstraintExpr!(expr, dict)
+    cols = collect(keys(dict))
+    vars = [dict[k] for k ∈ cols]
+    cols_expr = Expr(:vect, cols...)
+    fun_name = gensym()
+    o = quote
+        function $fun_name($(vars...)) 
+            $expr
+        end
+        constrain($df, $cols_expr, $fun_name)
+    end
+    esc(o)
 end
 export @constrain
 
