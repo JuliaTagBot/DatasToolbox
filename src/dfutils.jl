@@ -499,7 +499,7 @@ end
 
 function constrain(df::DataFrame, cols::Vector{Symbol}, f::Function)
     keep = BitArray(size(df, 1))
-    _dispatchConstrainFunc!(f, complete_cases(df), keep, (df[col] for col ∈ cols)...)
+    _dispatchConstrainFunc!(f, complete_cases(df[cols]), keep, (df[col] for col ∈ cols)...)
     df[keep, :]
 end
 export constrain
