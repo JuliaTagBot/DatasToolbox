@@ -110,3 +110,30 @@ end
 export infast
 
 
+# TODO these really should be kept in another package
+"""
+    outer(A, B)
+
+Performs the outer product of two tensors A_{i₁…iₙ}B_{j₁…jₙ}.
+
+**TODO** Currently only implemented for A and B as vectors.
+"""
+function outer(A::Vector, B::Vector)
+    C = Matrix(length(A), length(B))
+    for j ∈ 1:size(C, 2), i ∈ 1:size(C, 1)
+        C[i, j] = A[i]*B[j]
+    end
+    C
+end
+
+# there's no way around iterating over every element if A and B are dense
+function outer{T<:AbstractSparseArray}(::Type{T}, A::Vector, B::Vector)
+    C = spzeros(length(A), length(B))
+    for j ∈ 1:size(C, 2), i ∈ 1:size(C, 1)
+        C[i, j] = A[i]*B[j] # note that Julia keeps this element sparse if prod is 0.0
+    end
+    convert(T, C)
+end
+export outer
+
+

@@ -96,11 +96,11 @@ export convertPyDF
 Attempts to convert a `NullableArray` to have eltype `dtype` while replacing all Python
 `None`s with `Nullable`.
 """
-function fixPyNones(dtype::DataType, a::NullableArray)
+function fixPyNones{T}(::Type{T}, a::NullableArray)
     # exit silently if the array can't possibly hold Nones
     if !((eltype(a) == Any) | (eltype(a) == PyObject)) return end
     pyNone = pybuiltin("None")
-    newa = NullableArray(x == pyNone ? Nullable() : convert(dtype, x) for x in a)
+    newa = NullableArray(x == pyNone ? Nullable() : convert(T, x) for x in a)
 end
 export fixPyNones
 
@@ -111,8 +111,8 @@ export fixPyNones
 Attempts to convert a column of the dataframe to have eltype `dtype` while replacing all
 Python `None`s with `Nullable()`.
 """
-function fixPyNones!(dtype::DataType, df::DataFrame, col::Symbol)
-    df[col] = fixPyNones(dtype, df[col])
+function fixPyNones!{T}(::Type{T}, df::DataFrame, col::Symbol)
+    df[col] = fixPyNones(T, df[col])
     return df
 end
 export fixPyNones!
@@ -212,20 +212,20 @@ export shuffle!
 
 
 """
-    numericalCategories(otype::DataType, A::Array)
+    numericalCategories(otype, A)
 
 Converts a categorical variable into numerical values of the given type.
 
 Returns the mapping as well as the new array, but the mapping is just an array
 so it always maps to an integer
 """
-function numericalCategories(otype::DataType, A::Array)
+function numericalCategories{T}(::Type{T}, A::Array)
     mapping = sort!(unique(A))
-    o = convert(Array{otype}, indexin(A, mapping))
+    o = convert(Array{T}, indexin(A, mapping))
     return o, mapping
 end
 # define for NullableArray type
-numericalCategories(otype::DataType, A::NullableArray) = numericalCategories(otype, 
+numericalCategories{T}(::Type{T}, A::NullableArray) = numericalCategories(T, 
         convert(Array, A))
 export numericalCategories
 
@@ -250,9 +250,9 @@ type.
 
 Returns the mapping.
 """
-function numericalCategories!(otype::DataType, df::DataFrame, col::Symbol)
+function numericalCategories!{T}(::Type{T}, df::DataFrame, col::Symbol)
     df[Symbol(string(col)*"_Orig")] = df[col]
-    df[col], mapping = numericalCategories(otype, df[col])
+    df[col], mapping = numericalCategories(T, df[col])
     return mapping
 end
 export numericalCategories!
@@ -267,9 +267,9 @@ dataframe.
 **TODO** For now doesn't return mapping, may have to implement some type of 
 mapping type.
 """
-function numericalCategories!(otype::DataType, df::DataFrame, cols::Array{Symbol})
+function numericalCategories!{T}(::Type{T}, df::DataFrame, cols::Array{Symbol})
     for col in cols
-        numericalCategories!(otype, df, col)
+        numericalCategories!(T, df, col)
     end
     return
 end
