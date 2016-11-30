@@ -463,7 +463,7 @@ Alternatively one can use keyword arguments instead of a `Dict`.
 Also, one can pass a function the arguments of which are elements of columns specified
 by `cols`.
 """
-function constrain{K<:Symbol, V<:Function}(df::DataFrame, constraints::Dict{K, V})::DataFrame
+function constrain{K<:Symbol, V<:Function}(df::AbstractDataFrame, constraints::Dict{K, V})::DataFrame
     keep = ones(Bool, size(df, 1))
     for (col, bfunc) ∈ constraints
         _colconstraints!(df[col], bfunc, keep)
@@ -471,16 +471,15 @@ function constrain{K<:Symbol, V<:Function}(df::DataFrame, constraints::Dict{K, V
     df[keep, :]
 end
 
-function constrain{K, V<:Array}(df::DataFrame, constraints::Dict{K, V})::DataFrame
+function constrain{K, V<:Array}(df::AbstractDataFrame, constraints::Dict{K, V})::DataFrame
     newdict = Dict(k=>(x -> x ∈ v) for (k, v) ∈ constraints)
     constrain(df, newdict)
 end
 
-function constrain(df::DataFrame; kwargs...)
+function constrain(df::AbstractDataFrame; kwargs...)
     constrain(df, Dict(kwargs))
 end
 
-# this is the version used by the macro, this version only for NullableArrays
 function constrain_OLD(df::DataFrame, cols::Vector{Symbol}, f::Function)
     keep = BitArray(size(df, 1)) 
     for i ∈ 1:length(keep)
@@ -497,7 +496,7 @@ function constrain_OLD(df::DataFrame, cols::Vector{Symbol}, f::Function)
     df[keep, :]
 end
 
-function constrain(df::DataFrame, cols::Vector{Symbol}, f::Function)
+function constrain(df::AbstractDataFrame, cols::Vector{Symbol}, f::Function)
     keep = BitArray(size(df, 1))
     _dispatchConstrainFunc!(f, complete_cases(df[cols]), keep, (df[col] for col ∈ cols)...)
     df[keep, :]
@@ -721,11 +720,11 @@ function getCategoryVector{T, U}(A::NullableVector{T}, val::T, ::Type{U}=Int64)
     getCategoryVector(A, [val], U)
 end
 
-function getCategoryVector{U}(df::DataFrame, col::Symbol, vals::Vector, ::Type{U}=Int64)
+function getCategoryVector{U}(df::AbstractDataFrame, col::Symbol, vals::Vector, ::Type{U}=Int64)
     getCategoryVector(df[col], vals, U)
 end
 
-function getCategoryVector{U}(df::DataFrame, col::Symbol, val, ::Type{U}=Int64)
+function getCategoryVector{U}(df::AbstractDataFrame, col::Symbol, val, ::Type{U}=Int64)
     getCategoryVector(df[col], [val], U)
 end
 export getCategoryVector
