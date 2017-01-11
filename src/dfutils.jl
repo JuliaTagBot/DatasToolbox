@@ -37,12 +37,12 @@ function _inferColumnType(col::NullableArray; max_elements::Integer=100)::DataTy
 end
 
 
-function _fillNewCol!{T}(newcol::NullableArray{T}, df::DataFrame, col::Symbol)
+function _fillNewCol!{T, U}(newcol::NullableArray{T}, oldcol::NullableArray{U})
     for i in 1:length(newcol)
-        if isnull(df[i, col])
+        if isnull(oldcol[i])
             newcol[i] = Nullable()
         else
-            newcol[i] = get(df[i, col])
+            newcol[i] = get(oldcol[i])
         end
     end
 end
@@ -61,15 +61,13 @@ function fixColumnTypes!(df::DataFrame)
         dtype = _inferColumnType(df[col])
         # I can't find any way around getting into these stupid loops
         newcol = NullableArray{dtype}(length(df[col]))
-        _fillNewCol!(newcol, df, col)
+        _fillNewCol!(newcol, df[col])
         df[col] = newcol
     end
 end
 export fixColumnTypes!
 
 
-# TODO this still has the fix_nones option for legacy support, remove when
-# DataFrames with NullableArrays is in full release
 """
     convertPyDF(pydf[, fixtypes=true])
 
@@ -476,25 +474,7 @@ function constrain{K, V<:Array}(df::AbstractDataFrame, constraints::Dict{K, V}):
     constrain(df, newdict)
 end
 
-function constrain(df::AbstractDataFrame; kwargs...)
-    constrain(df, Dict(kwargs))
-end
-
-function constrain_OLD(df::DataFrame, cols::Vector{Symbol}, f::Function)
-    keep = BitArray(size(df, 1)) 
-    for i ∈ 1:length(keep)
-        # TODO is this efficient?  test, replace with generator function
-        # the ellipses operator seems to work ok here
-        row = df[i, cols]
-        if !complete_cases(row)[1]
-            # we never keep the nulls
-            keep[i] = false
-        else
-            keep[i] = f(convert(Array, row)...)
-        end
-    end
-    df[keep, :]
-end
+constrain(df::AbstractDataFrame; kwargs...) = constrain(df, Dict(kwargs))
 
 function constrain(df::AbstractDataFrame, cols::Vector{Symbol}, f::Function)
     keep = BitArray(size(df, 1))
@@ -505,6 +485,7 @@ export constrain
 
 
 # this is a helper function to @constrain
+# TODO fix this so it works for variables used multiple times
 function _checkConstraintExpr!(expr::Expr, dict::Dict)
     # the dictionary keys are the column names (as :(:col)) and the values are the symbols
     for (idx, arg) ∈ enumerate(expr.args)
@@ -631,22 +612,51 @@ export featherWrite
 
 
 """
-    featherRead(filename)
+    convertWeakRefStrings(df)
+    convertWeakRefStrings!(df)
 
-A wrapper for reading dataframes which are saved in feather files.  To be used while the
-Feather.jl package is in development.
+Converts all columns with eltype `Nullable{WeakRefString}` to have eltype `Nullable{String}`.
+`WeakRefString` is a special type of string used by the feather package to improve deserialization
+performance.
+
+Note that this will no longer be necessary in Julia 0.6.
 """
-function featherRead(filename::AbstractString)::DataFrame
-    bad_df = Feather.read(filename)
-    df = DataFrame()
-    for col in names(bad_df)
-        if eltype(bad_df[col]) == Nullable{Feather.WeakRefString{UInt8}}
-            df[col] = convert(NullableArray{String}, bad_df[col])
+function convertWeakRefStrings(df::AbstractDataFrame)
+    odf = DataFrame()
+    for col ∈ names(df)
+        if eltype(df[col]) <: Nullable{Feather.WeakRefString{UInt8}}
+            odf[col] = convert(NullableVector{String}, df[col])
         else
-            df[col] = bad_df[col]
+            odf[col] = df[col]
         end
     end
-    return df
+    odf
+end
+export convertWeakRefStrings
+function convertWeakRefStrings!(df::AbstractDataFrame)
+    for col ∈ names(df)
+        if eltype(df[col]) <: Nullable{Feather.WeakRefString{UInt8}}
+            df[col] = convert(NullableVector{String}, df[col])
+        end
+    end
+    df
+end
+export convertWeakRefStrings!
+
+
+"""
+    featherRead(filename[; convert_strings=true])
+
+A wrapper for reading dataframes which are saved in feather files.  The purpose of this
+wrapper is primarily for converting `WeakRefString` to `String`.  This will no longer
+be necessary in Julia 0.6.
+"""
+function featherRead(filename::AbstractString; convert_strings::Bool=true)::DataFrame
+    df = Feather.read(filename)
+    if convert_strings
+        convertWeakRefStrings!(df)
+    end
+    df
 end
 export featherRead
 
