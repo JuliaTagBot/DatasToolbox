@@ -483,12 +483,14 @@ function getTestAnalysisData(dh::AbstractDH, ŷ::Array; names::Vector{Symbol}=S
     df = dh.dfTest[1:size(ŷ)[1], :]
     for (idx, name) in enumerate(names)
         df[name] = ŷ[:, idx]
-        df[Symbol(string(name)*"_Error")] = df[name] - df[dh.colsOutput[idx]]
+        orig_col = convert(Vector, df[dh.colsOutput[idx]])
+        err = ŷ[:, idx] - orig_col
+        df[Symbol(string(name)*"_Error")] = err
         if squared_error
-            df[Symbol(string(name)*"_Error²")] = df[Symbol(string(name)*"_Error")].^2
+            df[Symbol(string(name)*"_Error²")] = err.^2
         end
     end
-    return df
+    df
 end
 export getTestAnalysisData
 
