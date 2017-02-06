@@ -29,7 +29,7 @@ One can also convert a pickled Python dataframe stored on local disk to a Julia 
 ## DataHandler
 
 
-The main functionality currently available in `DatasToolbox` is supplied with the  `DataHandler` type.  This type is designed for converting dataframes into usable machine learning data in the form of input, target pairs `X, y`.  The design philosophy is that hyper-parameter tuning and testing should be done completely separately.
+The main functionality currently available in `DatasToolbox` is supplied with the  `DataHandler` type.  This type is designed for converting dataframes into usable machine learning data in the form of input, target pairs $X, y$.  The design philosophy is that hyper-parameter tuning and testing should be done completely separately.
 
 
 <a id='DataHandler-Example-1'></a>
@@ -145,7 +145,7 @@ tsh = TimeSeriesHandler{Float64}(df, :τ, SEQ_LENGTH, input_cols=[:y], output_co
 ```
 
 
-Note that here the input and output columns are the same, because we are auto-regressing `y` on itself, but the input and output columns can be whatever you want.  In this case we also want to center and rescale the data so that it is more appropriate as input to a recurrent neural network.  This option is also avaialbe for the `DataHandler` object and works the same way as it will in this example.  It is required that the input dataframe has a time index.  `SEQ_LENGTH` provides the length of sequences in the training and test data.
+Note that here the input and output columns are the same, because we are auto-regressing $y$ on itself, but the input and output columns can be whatever you want.  In this case we also want to center and rescale the data so that it is more appropriate as input to a recurrent neural network.  This option is also avaialbe for the `DataHandler` object and works the same way as it will in this example.  It is required that the input dataframe has a time index.  `SEQ_LENGTH` provides the length of sequences in the training and test data.
 
 
 Now, one can create a train-test split and generate the properly formatted data.
@@ -167,7 +167,7 @@ The function `computeNormalizeParameters!` computes the parameters that are nece
 `X_train, y_train` are properly formatted arrays that can be fed into the training function of whatever method you are using.
 
 
-When testing a time series regression, it is often desirable to create a sequence of a  specified length by predicting on the previous `N` points.  This requires extremely complicated data manipulation, but can be done with
+When testing a time series regression, it is often desirable to create a sequence of a  specified length by predicting on the previous $N$ points.  This requires extremely complicated data manipulation, but can be done with
 
 
 ```julia
@@ -175,7 +175,7 @@ ŷ = generateSequence(predict, tsh, PREDICTION_LENGTH)
 ```
 
 
-The first argument should be the function that is used to make predictions.  This will generate a sequence by predicting on the last `N` points of the training set, then  predicting on the last `N-1` points of the training set and the 1 point which was just predicted, then the last `N-2` points of the training set and the 2 points which were just predicted and so forth.  If the predicted sequence is of the same length as the test set one can still do
+The first argument should be the function that is used to make predictions.  This will generate a sequence by predicting on the last $N$ points of the training set, then  predicting on the last $N-1$ points of the training set and the 1 point which was just predicted, then the last $N-2$ points of the training set and the 2 points which were just predicted and so forth.  If the predicted sequence is of the same length as the test set one can still do
 
 
 ```julia
@@ -186,6 +186,22 @@ output = getTestAnalysisData(tsh, ŷ, names=[:ŷ])
 <a id='API-Docs-1'></a>
 
 ## API Docs
+
+<a id='Base.Dict-Tuple{Array{K,1},Array{V,1}}' href='#Base.Dict-Tuple{Array{K,1},Array{V,1}}'>#</a>
+**`Base.Dict`** &mdash; *Method*.
+
+
+
+**DatasToolbox**
+
+`DatasToolbox` provides the following new constructors for `Dict`:
+
+```
+Dict(keys, values)
+Dict(df, keycol, valcol)
+```
+
+One can provide `Dict` with (equal length) vector arguments.  The first vector provides a list of keys, while the second provides a list of values. If the vectors are `NullableVector`, only key, value pairs with *both* their elements non-null will be added.
 
 <a id='DatasToolbox.AbstractDH' href='#DatasToolbox.AbstractDH'>#</a>
 **`DatasToolbox.AbstractDH`** &mdash; *Type*.
@@ -224,6 +240,19 @@ Type for handling time series data.  As with DataHandler it is intended taht mos
 
 The parameter T specifies the datatype of the input, output arrays.
 
+<a id='Base.LinAlg.normalize!-Tuple{DatasToolbox.AbstractDH{T}}' href='#Base.LinAlg.normalize!-Tuple{DatasToolbox.AbstractDH{T}}'>#</a>
+**`Base.LinAlg.normalize!`** &mdash; *Method*.
+
+
+
+```
+normalize!{T}(dh::AbstractDH{T}; dataset::Symbol=:dfTrain)
+normalizeTrain!(dh::AbstractDH)
+normalizeTest!(dh::AbstractDH)
+```
+
+Centers and rescales the columns set by `normalize_cols` in the `DataHandler` constructor.
+
 <a id='Base.Random.shuffle!-Tuple{DataFrames.DataFrame}' href='#Base.Random.shuffle!-Tuple{DataFrames.DataFrame}'>#</a>
 **`Base.Random.shuffle!`** &mdash; *Method*.
 
@@ -235,7 +264,7 @@ shuffle!(df::DataFrame)
 
 Shuffles a dataframe in place.
 
-<a id='Base.Random.shuffle!-Tuple{DatasToolbox.AbstractDH{T}}' href='#Base.Random.shuffle!-Tuple{DatasToolbox.AbstractDH{T}}'>#</a>
+<a id='Base.Random.shuffle!-Tuple{DatasToolbox.AbstractDH}' href='#Base.Random.shuffle!-Tuple{DatasToolbox.AbstractDH}'>#</a>
 **`Base.Random.shuffle!`** &mdash; *Method*.
 
 
@@ -268,51 +297,31 @@ serialize(filename::AbstractString, object)
 
 Serializes an object and stores on the local file system to file `filename`. This is quite similar to the functionality in `Base`, except that the default `serialize` method requires an `IOStream` object instead of a file name, so this eliminates an extra line of code.
 
-<a id='Base.convert-Tuple{Union{Type{Int32},Type{Int64}},DataArrays.DataArray{Float32,1}}' href='#Base.convert-Tuple{Union{Type{Int32},Type{Int64}},DataArrays.DataArray{Float32,1}}'>#</a>
+<a id='Base.convert-Tuple{Union{Type{Int32},Type{Int64}},NullableArrays.NullableArray{Float32,N}}' href='#Base.convert-Tuple{Union{Type{Int32},Type{Int64}},NullableArrays.NullableArray{Float32,N}}'>#</a>
 **`Base.convert`** &mdash; *Method*.
 
 
 
 ```
-convert(dtype::Union{Type{Int32}, Type{Int64}}, a::DataArray)
+convert(dtype, a)
 ```
 
-This converts a column of floats that should have been ints, but got converted to floats because it has missing values which were converted to NaN's. The supplied `DataArray` should have eltype `Float32` or `Float64`.
+This converts a column of floats that should have been ints, but got converted to floats because it has missing values which were converted to NaN's. The supplied `NullableArray` should have eltype `Float32` or `Float64`.
 
-<a id='DatasToolbox._fixBadPyConversions-Tuple{PyCall.PyObject,AbstractString}' href='#DatasToolbox._fixBadPyConversions-Tuple{PyCall.PyObject,AbstractString}'>#</a>
-**`DatasToolbox._fixBadPyConversions`** &mdash; *Method*.
-
-
-
-Checks to see if the column is one of the types known to fuck up conversions. If so, makes the appropriate changes.
-
-<a id='DatasToolbox._get_assign_data-Tuple{Symbol,DatasToolbox.TimeSeriesHandler{T}}' href='#DatasToolbox._get_assign_data-Tuple{Symbol,DatasToolbox.TimeSeriesHandler{T}}'>#</a>
-**`DatasToolbox._get_assign_data`** &mdash; *Method*.
+<a id='DatasToolbox.applyCatConstraints-Tuple{Dict,DataFrames.DataFrame}' href='#DatasToolbox.applyCatConstraints-Tuple{Dict,DataFrames.DataFrame}'>#</a>
+**`DatasToolbox.applyCatConstraints`** &mdash; *Method*.
 
 
 
-Used by assignTrain!, and assignTest!
+```
+applyCatConstraints(dict, df[, kwargs])
+```
 
-<a id='DatasToolbox._get_assign_data_parallel-Tuple{Symbol,DatasToolbox.TimeSeriesHandler{T}}' href='#DatasToolbox._get_assign_data_parallel-Tuple{Symbol,DatasToolbox.TimeSeriesHandler{T}}'>#</a>
-**`DatasToolbox._get_assign_data_parallel`** &mdash; *Method*.
+Returns a copy of the dataframe `df` with categorical constraints applied.  `dict` should  be a dictionary with keys equal to column names in `df` and values equal to the categorical values that column is allowed to take on.  For example, to select gauge bosons we can pass `Dict(:PID=>[i for i in 21:24; -24])`.  Alternatively, the values in the dictionary can be functions which return boolean values, in which case the returned dataframe will be the one with column values for which the functions return true.
 
+Note that this requires that the dictionary values are either `Vector` or `Function`  (though one can of course mix the two types).
 
-
-Parallel version, used by assignTrain! and assignTest!.
-
-<a id='DatasToolbox._replaceExprColNames!-Tuple{Expr,DatasToolbox.AbstractDH{T},Symbol}' href='#DatasToolbox._replaceExprColNames!-Tuple{Expr,DatasToolbox.AbstractDH{T},Symbol}'>#</a>
-**`DatasToolbox._replaceExprColNames!`** &mdash; *Method*.
-
-
-
-Used by constrain and split macros.  Looks through expressions for symbols of  columns, and replaces them with proper ref calls.
-
-<a id='DatasToolbox._squashXTensor-Tuple{Array{T,N},DatasToolbox.TimeSeriesHandler{T}}' href='#DatasToolbox._squashXTensor-Tuple{Array{T,N},DatasToolbox.TimeSeriesHandler{T}}'>#</a>
-**`DatasToolbox._squashXTensor`** &mdash; *Method*.
-
-
-
-Squashes the last two indices of a rank-3 tensor into a matrix.  For internal use.
+Alternatively, instead of passing a `Dict` one can pass keywords, for example `applyCatConstraints(df, PID=[i for i in 21:24; -24])`.
 
 <a id='DatasToolbox.assign!-Tuple{DatasToolbox.AbstractDH{T}}' href='#DatasToolbox.assign!-Tuple{DatasToolbox.AbstractDH{T}}'>#</a>
 **`DatasToolbox.assign!`** &mdash; *Method*.
@@ -325,7 +334,7 @@ assign!(dh::AbstractDH)
 
 Assigns training and test data in the data handler.
 
-<a id='DatasToolbox.assign!-Tuple{DatasToolbox.TimeSeriesHandler{T}}' href='#DatasToolbox.assign!-Tuple{DatasToolbox.TimeSeriesHandler{T}}'>#</a>
+<a id='DatasToolbox.assign!-Tuple{DatasToolbox.TimeSeriesHandler}' href='#DatasToolbox.assign!-Tuple{DatasToolbox.TimeSeriesHandler}'>#</a>
 **`DatasToolbox.assign!`** &mdash; *Method*.
 
 
@@ -349,7 +358,7 @@ Assigns the test data in the data handler.
 
 Note that this is silent if the test dataframe is empty.
 
-<a id='DatasToolbox.assignTest!-Tuple{DatasToolbox.TimeSeriesHandler{T}}' href='#DatasToolbox.assignTest!-Tuple{DatasToolbox.TimeSeriesHandler{T}}'>#</a>
+<a id='DatasToolbox.assignTest!-Tuple{DatasToolbox.TimeSeriesHandler}' href='#DatasToolbox.assignTest!-Tuple{DatasToolbox.TimeSeriesHandler}'>#</a>
 **`DatasToolbox.assignTest!`** &mdash; *Method*.
 
 
@@ -377,7 +386,7 @@ Assigns the training data in the data handler so it can be retrieved in proper f
 
 Note that this is silent if the training dataframe is empty.
 
-<a id='DatasToolbox.assignTrain!-Tuple{DatasToolbox.TimeSeriesHandler{T}}' href='#DatasToolbox.assignTrain!-Tuple{DatasToolbox.TimeSeriesHandler{T}}'>#</a>
+<a id='DatasToolbox.assignTrain!-Tuple{DatasToolbox.TimeSeriesHandler}' href='#DatasToolbox.assignTrain!-Tuple{DatasToolbox.TimeSeriesHandler}'>#</a>
 **`DatasToolbox.assignTrain!`** &mdash; *Method*.
 
 
@@ -391,17 +400,6 @@ Assigns the training data.  X output will be of shape (samples, seq_length, seq_
 Note that this is silent if the dataframe is empty.
 
 **TODO** I'm pretty sure the parallel version isn't working right because it doesn't use shared arrays.  Revisit in v0.5 with threads.
-
-<a id='DatasToolbox.canNormalize-Tuple{DatasToolbox.AbstractDH{T}}' href='#DatasToolbox.canNormalize-Tuple{DatasToolbox.AbstractDH{T}}'>#</a>
-**`DatasToolbox.canNormalize`** &mdash; *Method*.
-
-
-
-```
-canNormalize(dh::AbstractDH)
-```
-
-Determines whether the data in the datahandler can be normlized, i.e. because the parameters have or haven't been computed yet.
 
 <a id='DatasToolbox.computeNormalizeParameters!-Tuple{DatasToolbox.AbstractDH{T}}' href='#DatasToolbox.computeNormalizeParameters!-Tuple{DatasToolbox.AbstractDH{T}}'>#</a>
 **`DatasToolbox.computeNormalizeParameters!`** &mdash; *Method*.
@@ -418,18 +416,22 @@ Does this using the training dataframe by default, but can be set to use test. E
 
 This should always be called before `normalize!`, that way you have control over what dataset the parameters are computed from.
 
-<a id='DatasToolbox.convertCol-Tuple{DataFrames.DataFrame,Symbol,DataType}' href='#DatasToolbox.convertCol-Tuple{DataFrames.DataFrame,Symbol,DataType}'>#</a>
-**`DatasToolbox.convertCol`** &mdash; *Method*.
+<a id='DatasToolbox.constrain-Tuple{DataFrames.AbstractDataFrame,Dict{K<:Symbol,V<:Function}}' href='#DatasToolbox.constrain-Tuple{DataFrames.AbstractDataFrame,Dict{K<:Symbol,V<:Function}}'>#</a>
+**`DatasToolbox.constrain`** &mdash; *Method*.
 
 
 
 ```
-convertCol(df::DataFrame, col::Symbol, dtype::DataType)
+constrain(df, dict)
+constrain(df, kwargs...)
+constrain(df, cols, func)
 ```
 
-Converts a column, possibly containing python objects, to a column with eltype `dtype`. The column itself will be a `DataArray` with `NA` values inserted where Python `None`s are found.  Note that this isn't terribly efficient because it has to check for `None`s.
+Returns a subset of the dataframe `df` for which the column `key` satisfies  `value(df[i, key]) == true`.  Where `(key, value)` are the pairs in `dict`.   Alternatively one can use keyword arguments instead of a `Dict`.
 
-<a id='DatasToolbox.convertNulls!-Tuple{Array{T,1},T}' href='#DatasToolbox.convertNulls!-Tuple{Array{T,1},T}'>#</a>
+Also, one can pass a function the arguments of which are elements of columns specified by `cols`.
+
+<a id='DatasToolbox.convertNulls!-Tuple{Array{T<:AbstractFloat,1},T<:AbstractFloat}' href='#DatasToolbox.convertNulls!-Tuple{Array{T<:AbstractFloat,1},T<:AbstractFloat}'>#</a>
 **`DatasToolbox.convertNulls!`** &mdash; *Method*.
 
 
@@ -453,16 +455,27 @@ Convert all null values in columns of a DataFrame to a particular value.
 
 There is also a method for passing a single column symbol, not as a vector.
 
-<a id='DatasToolbox.convertNulls-Tuple{DataArrays.DataArray{T,N},T}' href='#DatasToolbox.convertNulls-Tuple{DataArrays.DataArray{T,N},T}'>#</a>
+<a id='DatasToolbox.convertNulls-Tuple{NullableArrays.NullableArray{T,N},T}' href='#DatasToolbox.convertNulls-Tuple{NullableArrays.NullableArray{T,N},T}'>#</a>
 **`DatasToolbox.convertNulls`** &mdash; *Method*.
 
 
 
 ```
-convertNulls{T}(A::DataArray{T}, newvalue::T)
+convertNulls{T}(A, newvalue)
 ```
 
-Converts all null vlaues (NA's, NaN's and Nullable()) to a particular value.
+Converts all null vlaues (NaN's and Nullable()) to a particular value. This is a wrapper added for sake of naming consistency.
+
+<a id='DatasToolbox.convertPyColumn-Tuple{PyCall.PyObject}' href='#DatasToolbox.convertPyColumn-Tuple{PyCall.PyObject}'>#</a>
+**`DatasToolbox.convertPyColumn`** &mdash; *Method*.
+
+
+
+```
+convertPyColumn(pycol::PyObject)
+```
+
+Converts a column of a pandas array to a Julia `NullableArray`.
 
 <a id='DatasToolbox.convertPyDF-Tuple{PyCall.PyObject}' href='#DatasToolbox.convertPyDF-Tuple{PyCall.PyObject}'>#</a>
 **`DatasToolbox.convertPyDF`** &mdash; *Method*.
@@ -470,10 +483,26 @@ Converts all null vlaues (NA's, NaN's and Nullable()) to a particular value.
 
 
 ```
-convertPyDF(df::PyObject; migrate::Bool=true, fix_nones::Bool=true)
+convertPyDF(pydf[, fixtypes=true])
 ```
 
-Converts a pandas dataframe to a Julia dataframe.  If `migrate` is true this will try to properly assign types to columns.  If `fix_nones` is true, this will check for columns which have eltype `PyObject` and convert them to have eltype `Any`, replacing all Python `None`s with `NA`.
+Converts a pandas dataframe to a Julia one.  
+
+Note that it is difficult to infer the correct types of columns which contain references to Python objects.  If `fixtypes`, this will attempt to convert any column with eltype `Any` to the proper type.
+
+<a id='DatasToolbox.convertWeakRefStrings-Tuple{DataFrames.AbstractDataFrame}' href='#DatasToolbox.convertWeakRefStrings-Tuple{DataFrames.AbstractDataFrame}'>#</a>
+**`DatasToolbox.convertWeakRefStrings`** &mdash; *Method*.
+
+
+
+```
+convertWeakRefStrings(df)
+convertWeakRefStrings!(df)
+```
+
+Converts all columns with eltype `Nullable{WeakRefString}` to have eltype `Nullable{String}`. `WeakRefString` is a special type of string used by the feather package to improve deserialization performance.
+
+Note that this will no longer be necessary in Julia 0.6.
 
 <a id='DatasToolbox.copyColumns-Tuple{DataFrames.DataFrame}' href='#DatasToolbox.copyColumns-Tuple{DataFrames.DataFrame}'>#</a>
 **`DatasToolbox.copyColumns`** &mdash; *Method*.
@@ -501,7 +530,42 @@ Note that deepcopy is recursive, so this is *NOT* the same thing as deepcopy(df)
 discreteDiff{T}(X::Array{T, 1})
 ```
 
-Returns the discrete difference between adjacent elements of a time series.  So,  for instance, if one has a time series `y_{1},y_{2},ldots,y_{N}` this will return a set of `δ` such that `δ_{i} = y_{i+1} - y_{i}`.  The first element of the returned array will be a `NaN`.
+Returns the discrete difference between adjacent elements of a time series.  So,  for instance, if one has a time series $y_{1},y_{2},ldots,y_{N}$ this will return a set of $δ$ such that $δ_{i} = y_{i+1} - y_{i}$.  The first element of the returned array will be a `NaN`.
+
+<a id='DatasToolbox.featherRead-Tuple{AbstractString}' href='#DatasToolbox.featherRead-Tuple{AbstractString}'>#</a>
+**`DatasToolbox.featherRead`** &mdash; *Method*.
+
+
+
+```
+featherRead(filename[; convert_strings=true])
+```
+
+A wrapper for reading dataframes which are saved in feather files.  The purpose of this wrapper is primarily for converting `WeakRefString` to `String`.  This will no longer be necessary in Julia 0.6.
+
+<a id='DatasToolbox.featherWrite-Tuple{AbstractString,DataFrames.DataFrame}' href='#DatasToolbox.featherWrite-Tuple{AbstractString,DataFrames.DataFrame}'>#</a>
+**`DatasToolbox.featherWrite`** &mdash; *Method*.
+
+
+
+```
+featherWrite(filename, df[, overwrite=false])
+```
+
+A wrapper for writing dataframes to feather files.  To be used while Feather.jl package is in development.
+
+If `overwrite`, this will delete the existing file first (an extra step taken to avoid some strange bugs).
+
+<a id='DatasToolbox.fixColumnTypes!-Tuple{DataFrames.DataFrame}' href='#DatasToolbox.fixColumnTypes!-Tuple{DataFrames.DataFrame}'>#</a>
+**`DatasToolbox.fixColumnTypes!`** &mdash; *Method*.
+
+
+
+```
+fixColumnTypes!(df)
+```
+
+Check to see if the dataframe `df` has any columns of type `Any` and attempt to convert them to the proper types.  This can be called from `convertPyDF` with the option `fixtypes`.
 
 <a id='DatasToolbox.fixPyNones!-Tuple{DataFrames.DataFrame}' href='#DatasToolbox.fixPyNones!-Tuple{DataFrames.DataFrame}'>#</a>
 **`DatasToolbox.fixPyNones!`** &mdash; *Method*.
@@ -512,9 +576,9 @@ Returns the discrete difference between adjacent elements of a time series.  So,
 fixPyNones!(df::DataFrame)
 ```
 
-Attempts to automatically convert all columns of a dataframe to have eltype `Any` while replacing all Python `None`s with `NA`.
+Attempts to automatically convert all columns of a dataframe to have eltype `Any` while replacing all Python `None`s with `Nullable()`.
 
-<a id='DatasToolbox.fixPyNones!-Tuple{DataType,DataFrames.DataFrame,Symbol}' href='#DatasToolbox.fixPyNones!-Tuple{DataType,DataFrames.DataFrame,Symbol}'>#</a>
+<a id='DatasToolbox.fixPyNones!-Tuple{Type{T},DataFrames.DataFrame,Symbol}' href='#DatasToolbox.fixPyNones!-Tuple{Type{T},DataFrames.DataFrame,Symbol}'>#</a>
 **`DatasToolbox.fixPyNones!`** &mdash; *Method*.
 
 
@@ -523,38 +587,37 @@ Attempts to automatically convert all columns of a dataframe to have eltype `Any
 fixPyNones!(dtype::DataType, df::DataFrame, col::Symbol)
 ```
 
-Attempts to convert a column of the dataframe to have eltype `dtype` while replacing all Python `None`s with `NA`.
+Attempts to convert a column of the dataframe to have eltype `dtype` while replacing all Python `None`s with `Nullable()`.
 
-<a id='DatasToolbox.fixPyNones-Tuple{DataType,DataArrays.DataArray{T,N}}' href='#DatasToolbox.fixPyNones-Tuple{DataType,DataArrays.DataArray{T,N}}'>#</a>
+<a id='DatasToolbox.fixPyNones-Tuple{Type{T},NullableArrays.NullableArray}' href='#DatasToolbox.fixPyNones-Tuple{Type{T},NullableArrays.NullableArray}'>#</a>
 **`DatasToolbox.fixPyNones`** &mdash; *Method*.
 
 
 
 ```
-fixPyNones(dtype::DataType, a::DataArray)
+fixPyNones(dtype, a)
 ```
 
-Attempts to convert a `DataArray` to have eltype `dtype` while replacing all Python `None`s with `NA`.
+Attempts to convert a `NullableArray` to have eltype `dtype` while replacing all Python `None`s with `Nullable`.
 
-<a id='DatasToolbox.generateSequence' href='#DatasToolbox.generateSequence'>#</a>
-**`DatasToolbox.generateSequence`** &mdash; *Function*.
+<a id='DatasToolbox.generateSequence-Tuple{Function,DatasToolbox.TimeSeriesHandler{T},Integer}' href='#DatasToolbox.generateSequence-Tuple{Function,DatasToolbox.TimeSeriesHandler{T},Integer}'>#</a>
+**`DatasToolbox.generateSequence`** &mdash; *Method*.
 
 
 
 ```
-generateSequence(predict::Function, dh::TimeSeriesHandler,
-                 seq_length::Integer=8; on_matrix::Bool=false)
+generateSequence(predict, dh, seq_length[, newcol_func; on_matrix=false])
 ```
 
-Uses the supplied prediction function to generate a sequence of a specified length. The sequence uses the end of the training dataset as initial input.
+Uses the supplied prediction function `predict` to generate a sequence of length `seq_length`. The sequence uses the end of the training dataset as initial input.
 
-Note that this only makes sense if the intersection between the input and output columns isn't ∅.  For now we enforce that they must be identical.
+Note that this only makes sense when the output columns are a subset of the input columns. Each row of the sequence output matrix will have the same columns as the input matrix.
+
+If a function returning a dictionary or a dictionary of functions `newcol_func` is supplied, every time a new row of the input is generated, it will have columns specified by  `newcol_func`.  The dictionary should have keys equal to the column numbers of columns in the input matrix and values equal to functions that take a `Vector` (the previous input row) and output a new value for the column number given by the key.  The column numbers correspond to the index of the column in the specified input columns.
 
 If `on_matrix` is true, the prediction function will take a matrix as input rather than a rank-3 tensor.
 
-**TODO** Fix this so that it works for arbitrary input, output.
-
-<a id='DatasToolbox.generateTest-Tuple{Function,DatasToolbox.TimeSeriesHandler{T}}' href='#DatasToolbox.generateTest-Tuple{Function,DatasToolbox.TimeSeriesHandler{T}}'>#</a>
+<a id='DatasToolbox.generateTest-Tuple{Function,DatasToolbox.TimeSeriesHandler}' href='#DatasToolbox.generateTest-Tuple{Function,DatasToolbox.TimeSeriesHandler}'>#</a>
 **`DatasToolbox.generateTest`** &mdash; *Method*.
 
 
@@ -567,7 +630,20 @@ Uses the supplied prediction function to attempt to predict the entire test set.
 
 See the documentation for `generateSequence`.
 
-<a id='DatasToolbox.getDefaultCategoricalMapping-Tuple{Array{T,N}}' href='#DatasToolbox.getDefaultCategoricalMapping-Tuple{Array{T,N}}'>#</a>
+<a id='DatasToolbox.getCategoryVector' href='#DatasToolbox.getCategoryVector'>#</a>
+**`DatasToolbox.getCategoryVector`** &mdash; *Function*.
+
+
+
+```
+getCategoryVector(A, vals[, dtype])
+```
+
+Get a vector which is 1 for each `a ∈ A` that satisfies `a ∈ vals`, and 0 otherwise. If `A` is a `NullableVector`, any null elements will be mapped to 0.
+
+Optionally, one can specify the datatype of the output vector.
+
+<a id='DatasToolbox.getDefaultCategoricalMapping-Tuple{Array}' href='#DatasToolbox.getDefaultCategoricalMapping-Tuple{Array}'>#</a>
 **`DatasToolbox.getDefaultCategoricalMapping`** &mdash; *Method*.
 
 
@@ -577,6 +653,19 @@ getDefaultCategoricalMapping(A::Array)
 ```
 
 Gets the default mapping of categorical variables which would be returned by numericalCategories.
+
+<a id='DatasToolbox.getNormedHistogramData-Tuple{Array{T<:Real,1}}' href='#DatasToolbox.getNormedHistogramData-Tuple{Array{T<:Real,1}}'>#</a>
+**`DatasToolbox.getNormedHistogramData`** &mdash; *Method*.
+
+
+
+```
+getNormedHistogramData(X)
+```
+
+Very annoyingly Gadfly does not yet support normed histograms.
+
+This function returns an ordered pair of vectors which can be  fed to gadfly to create a normed histogram.  If the output is `m, w` one can do `plot(x=m, y=w, Geom.bar)` to create a histogram.
 
 <a id='DatasToolbox.getRawTestTarget-Tuple{DatasToolbox.TimeSeriesHandler{T}}' href='#DatasToolbox.getRawTestTarget-Tuple{DatasToolbox.TimeSeriesHandler{T}}'>#</a>
 **`DatasToolbox.getRawTestTarget`** &mdash; *Method*.
@@ -589,7 +678,7 @@ getRawTestTarget(dh::TimeSeriesHandler)
 
 Returns `y_test` directly from the dataframe for comparison with the output of generateTest.
 
-<a id='DatasToolbox.getSquashedTestMatrix-Tuple{DatasToolbox.TimeSeriesHandler{T}}' href='#DatasToolbox.getSquashedTestMatrix-Tuple{DatasToolbox.TimeSeriesHandler{T}}'>#</a>
+<a id='DatasToolbox.getSquashedTestMatrix-Tuple{DatasToolbox.TimeSeriesHandler}' href='#DatasToolbox.getSquashedTestMatrix-Tuple{DatasToolbox.TimeSeriesHandler}'>#</a>
 **`DatasToolbox.getSquashedTestMatrix`** &mdash; *Method*.
 
 
@@ -602,7 +691,7 @@ Gets a test input tensor in which all the inputs are arranged along a single axi
 
 Assumes the handler's X_test is defined.
 
-<a id='DatasToolbox.getSquashedTrainData-Tuple{DatasToolbox.TimeSeriesHandler{T}}' href='#DatasToolbox.getSquashedTrainData-Tuple{DatasToolbox.TimeSeriesHandler{T}}'>#</a>
+<a id='DatasToolbox.getSquashedTrainData-Tuple{DatasToolbox.TimeSeriesHandler}' href='#DatasToolbox.getSquashedTrainData-Tuple{DatasToolbox.TimeSeriesHandler}'>#</a>
 **`DatasToolbox.getSquashedTrainData`** &mdash; *Method*.
 
 
@@ -613,7 +702,7 @@ getSquashedTrainData(dh::TimeSeriesHandler; flatten::Bool=false)
 
 Gets the training X, y pair where X is squashed using `getSquahdedTrainMatrix`. If `flatten`, also flatten `y`.
 
-<a id='DatasToolbox.getSquashedTrainMatrix-Tuple{DatasToolbox.TimeSeriesHandler{T}}' href='#DatasToolbox.getSquashedTrainMatrix-Tuple{DatasToolbox.TimeSeriesHandler{T}}'>#</a>
+<a id='DatasToolbox.getSquashedTrainMatrix-Tuple{DatasToolbox.TimeSeriesHandler}' href='#DatasToolbox.getSquashedTrainMatrix-Tuple{DatasToolbox.TimeSeriesHandler}'>#</a>
 **`DatasToolbox.getSquashedTrainMatrix`** &mdash; *Method*.
 
 
@@ -626,7 +715,7 @@ Gets a training input tensor in which all the inputs are arranged along a single
 
 Assumes the handler's X_train is defined.
 
-<a id='DatasToolbox.getTestAnalysisData-Tuple{DatasToolbox.AbstractDH{T},Array{T,N}}' href='#DatasToolbox.getTestAnalysisData-Tuple{DatasToolbox.AbstractDH{T},Array{T,N}}'>#</a>
+<a id='DatasToolbox.getTestAnalysisData-Tuple{DatasToolbox.AbstractDH,Array}' href='#DatasToolbox.getTestAnalysisData-Tuple{DatasToolbox.AbstractDH,Array}'>#</a>
 **`DatasToolbox.getTestAnalysisData`** &mdash; *Method*.
 
 
@@ -644,7 +733,7 @@ Also generates error columns which are the difference between predictions and te
 
 Note that this currently does nothing to handle transformations of the data.
 
-<a id='DatasToolbox.getTestData-Tuple{DatasToolbox.AbstractDH{T}}' href='#DatasToolbox.getTestData-Tuple{DatasToolbox.AbstractDH{T}}'>#</a>
+<a id='DatasToolbox.getTestData-Tuple{DatasToolbox.AbstractDH}' href='#DatasToolbox.getTestData-Tuple{DatasToolbox.AbstractDH}'>#</a>
 **`DatasToolbox.getTestData`** &mdash; *Method*.
 
 
@@ -657,7 +746,7 @@ Gets the test data input, output tuple `X, y`.
 
 If `flatten`, attempts to flatten `y`.
 
-<a id='DatasToolbox.getTrainData-Tuple{DatasToolbox.AbstractDH{T}}' href='#DatasToolbox.getTrainData-Tuple{DatasToolbox.AbstractDH{T}}'>#</a>
+<a id='DatasToolbox.getTrainData-Tuple{DatasToolbox.AbstractDH}' href='#DatasToolbox.getTrainData-Tuple{DatasToolbox.AbstractDH}'>#</a>
 **`DatasToolbox.getTrainData`** &mdash; *Method*.
 
 
@@ -670,42 +759,41 @@ Gets the training data input, output tuple `X, y`.
 
 If `flatten`, attempts to flatten `y`.
 
-<a id='DatasToolbox.loadPickledDF-Tuple{AbstractString}' href='#DatasToolbox.loadPickledDF-Tuple{AbstractString}'>#</a>
-**`DatasToolbox.loadPickledDF`** &mdash; *Method*.
+<a id='DatasToolbox.infast-Tuple{T,Array{T,1}}' href='#DatasToolbox.infast-Tuple{T,Array{T,1}}'>#</a>
+**`DatasToolbox.infast`** &mdash; *Method*.
 
 
 
 ```
-loadPickledDF(filename::AbstractString; migrate::Bool=true, fix_nones::Bool=true)
+infast(x, collection)
 ```
 
-Loads a pickled python dataframe, converting it to a Julia dataframe using `convertPyDF`.
+Checks whether the object `x` is in `collection`. This is done efficiently by creating hashes for the objects in `collection`.  This should only be used if `collection` is large, as there is overhead in hashing and allocating.
 
-<a id='DatasToolbox.migrateTypes!-Tuple{DataFrames.DataFrame}' href='#DatasToolbox.migrateTypes!-Tuple{DataFrames.DataFrame}'>#</a>
-**`DatasToolbox.migrateTypes!`** &mdash; *Method*.
-
-
-
-```
-migrateTypes!(df::DataFrame)
-```
-
-Attempts to convert all columns of a dataframe to the proper type based on the Python types found in it.   **TODO** Right now this just checks the first elements in the column.  Also, will have to change `ASCIIString` conversion to `String` for Julia v0.5.
-
-<a id='DatasToolbox.normalize!-Tuple{DatasToolbox.AbstractDH{T}}' href='#DatasToolbox.normalize!-Tuple{DatasToolbox.AbstractDH{T}}'>#</a>
-**`DatasToolbox.normalize!`** &mdash; *Method*.
+<a id='DatasToolbox.makeTestDF-Tuple{Vararg{DataType,N}}' href='#DatasToolbox.makeTestDF-Tuple{Vararg{DataType,N}}'>#</a>
+**`DatasToolbox.makeTestDF`** &mdash; *Method*.
 
 
 
 ```
-normalize!{T}(dh::AbstractDH{T}; dataset::Symbol=:dfTrain)
-normalizeTrain!(dh::AbstractDH)
-normalizeTest!(dh::AbstractDH)
+makeTestDF(dtypes...; nrows=10^4)
 ```
 
-Centers and rescales the columns set by `normalize_cols` in the `DataHandler` constructor.
+Creates a random dataframe with columns of types specified by `dtypes`.  This is useful for testing various dataframe related functionality.
 
-<a id='DatasToolbox.numericalCategories!-Tuple{DataType,DataFrames.DataFrame,Array{Symbol,N}}' href='#DatasToolbox.numericalCategories!-Tuple{DataType,DataFrames.DataFrame,Array{Symbol,N}}'>#</a>
+<a id='DatasToolbox.nans2nulls-Tuple{NullableArrays.NullableArray{T,N}}' href='#DatasToolbox.nans2nulls-Tuple{NullableArrays.NullableArray{T,N}}'>#</a>
+**`DatasToolbox.nans2nulls`** &mdash; *Method*.
+
+
+
+```
+nans2nulls(col)
+nans2nulls(df, colname)
+```
+
+Converts all `NaN`s appearing in the column to `Nullable()`.  The return type is `NullableArray`, even if the original type of the column is not.
+
+<a id='DatasToolbox.numericalCategories!-Tuple{Type{T},DataFrames.DataFrame,Array{Symbol,N}}' href='#DatasToolbox.numericalCategories!-Tuple{Type{T},DataFrames.DataFrame,Array{Symbol,N}}'>#</a>
 **`DatasToolbox.numericalCategories!`** &mdash; *Method*.
 
 
@@ -718,7 +806,7 @@ Converts categorical variables into numerical values for multiple columns in a d
 
 **TODO** For now doesn't return mapping, may have to implement some type of  mapping type.
 
-<a id='DatasToolbox.numericalCategories!-Tuple{DataType,DataFrames.DataFrame,Symbol}' href='#DatasToolbox.numericalCategories!-Tuple{DataType,DataFrames.DataFrame,Symbol}'>#</a>
+<a id='DatasToolbox.numericalCategories!-Tuple{Type{T},DataFrames.DataFrame,Symbol}' href='#DatasToolbox.numericalCategories!-Tuple{Type{T},DataFrames.DataFrame,Symbol}'>#</a>
 **`DatasToolbox.numericalCategories!`** &mdash; *Method*.
 
 
@@ -731,18 +819,53 @@ Converts a categorical value in a column into a numerical variable of the given 
 
 Returns the mapping.
 
-<a id='DatasToolbox.numericalCategories-Tuple{DataType,Array{T,N}}' href='#DatasToolbox.numericalCategories-Tuple{DataType,Array{T,N}}'>#</a>
+<a id='DatasToolbox.numericalCategories-Tuple{Type{T},Array}' href='#DatasToolbox.numericalCategories-Tuple{Type{T},Array}'>#</a>
 **`DatasToolbox.numericalCategories`** &mdash; *Method*.
 
 
 
 ```
-numericalCategories(otype::DataType, A::Array)
+numericalCategories(otype, A)
 ```
 
 Converts a categorical variable into numerical values of the given type.
 
 Returns the mapping as well as the new array, but the mapping is just an array so it always maps to an integer
+
+<a id='DatasToolbox.outer-Tuple{Array{T,1},Array{T,1}}' href='#DatasToolbox.outer-Tuple{Array{T,1},Array{T,1}}'>#</a>
+**`DatasToolbox.outer`** &mdash; *Method*.
+
+
+
+```
+outer(A, B)
+```
+
+Performs the outer product of two tensors A_{i₁…iₙ}B_{j₁…jₙ}.
+
+**TODO** Currently only implemented for A and B as vectors.
+
+<a id='DatasToolbox.pandas-Tuple{DataFrames.DataFrame}' href='#DatasToolbox.pandas-Tuple{DataFrames.DataFrame}'>#</a>
+**`DatasToolbox.pandas`** &mdash; *Method*.
+
+
+
+```
+pandas(df)
+```
+
+Convert a dataframe to a pandas pyobject.
+
+<a id='DatasToolbox.pickle-Tuple{String,Any}' href='#DatasToolbox.pickle-Tuple{String,Any}'>#</a>
+**`DatasToolbox.pickle`** &mdash; *Method*.
+
+
+
+```
+pickle(filename, object)
+```
+
+Converts the provided object to a PyObject and serializes it in the python pickle format.  If the object provided is a `DataFrame`, this will first convert it to a pandas dataframe.
 
 <a id='DatasToolbox.pwd2PyPath-Tuple{}' href='#DatasToolbox.pwd2PyPath-Tuple{}'>#</a>
 **`DatasToolbox.pwd2PyPath`** &mdash; *Method*.
@@ -755,7 +878,7 @@ pwd2PyPath()
 
 Adds the present working directory to the python path variable.
 
-<a id='DatasToolbox.split!-Tuple{DatasToolbox.AbstractDH{T},AbstractFloat}' href='#DatasToolbox.split!-Tuple{DatasToolbox.AbstractDH{T},AbstractFloat}'>#</a>
+<a id='DatasToolbox.split!-Tuple{DatasToolbox.AbstractDH,AbstractFloat}' href='#DatasToolbox.split!-Tuple{DatasToolbox.AbstractDH,AbstractFloat}'>#</a>
 **`DatasToolbox.split!`** &mdash; *Method*.
 
 
@@ -767,7 +890,7 @@ split!(dh::AbstractDH, testfrac::AbstractFloat; shuffle::Bool=false,
 
 Creates a train, test split by fraction.  The fraction given is the test fraction.
 
-<a id='DatasToolbox.split!-Tuple{DatasToolbox.AbstractDH{T},BitArray{N}}' href='#DatasToolbox.split!-Tuple{DatasToolbox.AbstractDH{T},BitArray{N}}'>#</a>
+<a id='DatasToolbox.split!-Tuple{DatasToolbox.AbstractDH,BitArray}' href='#DatasToolbox.split!-Tuple{DatasToolbox.AbstractDH,BitArray}'>#</a>
 **`DatasToolbox.split!`** &mdash; *Method*.
 
 
@@ -778,7 +901,7 @@ split!(dh::AbstractDH, constraint::BitArray)
 
 Splits the data into training and test sets using a BitArray that must correspond to elements of dh.df.  The elements of the dataframe for which the BitArray holds 1 will be in the test  set, the remaining elements will be in the training set.
 
-<a id='DatasToolbox.split!-Tuple{DatasToolbox.AbstractDH{T},Integer}' href='#DatasToolbox.split!-Tuple{DatasToolbox.AbstractDH{T},Integer}'>#</a>
+<a id='DatasToolbox.split!-Tuple{DatasToolbox.AbstractDH,Integer}' href='#DatasToolbox.split!-Tuple{DatasToolbox.AbstractDH,Integer}'>#</a>
 **`DatasToolbox.split!`** &mdash; *Method*.
 
 
@@ -789,7 +912,7 @@ split!(dh::AbstractDH, index::Integer; assign::Bool=true)
 
 Creates a train, test split by index.  The index given is the last index of the training set. If `assign`, this will assign the training and test data.
 
-<a id='DatasToolbox.split!-Tuple{DatasToolbox.TimeSeriesHandler{T},Integer}' href='#DatasToolbox.split!-Tuple{DatasToolbox.TimeSeriesHandler{T},Integer}'>#</a>
+<a id='DatasToolbox.split!-Tuple{DatasToolbox.TimeSeriesHandler,Integer}' href='#DatasToolbox.split!-Tuple{DatasToolbox.TimeSeriesHandler,Integer}'>#</a>
 **`DatasToolbox.split!`** &mdash; *Method*.
 
 
@@ -800,7 +923,7 @@ split!(dh::TimeSeriesHandler, τ₀::Integer; assign::Bool=true, sort::Bool=true
 
 Splits the data by time-index.  All datapoints with τ up to and including the timeindex given (τ₀) will be in the training set, while all those with τ > τ₀ will be in  the test set.
 
-<a id='DatasToolbox.splitByNSequences!-Tuple{DatasToolbox.TimeSeriesHandler{T},Integer}' href='#DatasToolbox.splitByNSequences!-Tuple{DatasToolbox.TimeSeriesHandler{T},Integer}'>#</a>
+<a id='DatasToolbox.splitByNSequences!-Tuple{DatasToolbox.TimeSeriesHandler,Integer}' href='#DatasToolbox.splitByNSequences!-Tuple{DatasToolbox.TimeSeriesHandler,Integer}'>#</a>
 **`DatasToolbox.splitByNSequences!`** &mdash; *Method*.
 
 
@@ -814,7 +937,7 @@ Splits the dataframe by the number of sequences in the test set.  This does noth
 
 Note that the actual number of usable test sequences in the resulting test set is of course greater than n_sequences.
 
-<a id='DatasToolbox.trainOnMatrix-Tuple{Function,DatasToolbox.TimeSeriesHandler{T}}' href='#DatasToolbox.trainOnMatrix-Tuple{Function,DatasToolbox.TimeSeriesHandler{T}}'>#</a>
+<a id='DatasToolbox.trainOnMatrix-Tuple{Function,DatasToolbox.TimeSeriesHandler}' href='#DatasToolbox.trainOnMatrix-Tuple{Function,DatasToolbox.TimeSeriesHandler}'>#</a>
 **`DatasToolbox.trainOnMatrix`** &mdash; *Method*.
 
 
@@ -840,7 +963,18 @@ unnormalize!{T}(dh::AbstractDH{T}, X::Matrix{T}, cols::Vector{Symbol})
 
 Performs the inverse of the centering and rescaling operations on a matrix. This can also be called on a single column with a `Symbol` as the last argument.
 
-<a id='DatasToolbox.@constrain!' href='#DatasToolbox.@constrain!'>#</a>
+<a id='DatasToolbox.unpickle-Tuple{String}' href='#DatasToolbox.unpickle-Tuple{String}'>#</a>
+**`DatasToolbox.unpickle`** &mdash; *Method*.
+
+
+
+```
+unpickle([dtype,] filename[, fixtypes=true])
+```
+
+Deserializes a python pickle file and returns the object it contains. Additionally, if `DataFrame` is given as the first argument, will attempt to convert the object to a Julia dataframe with the flag `fixtypes` (see `convertPyDF`).
+
+<a id='DatasToolbox.@constrain!-Tuple{Any,Any,Any}' href='#DatasToolbox.@constrain!-Tuple{Any,Any,Any}'>#</a>
 **`DatasToolbox.@constrain!`** &mdash; *Macro*.
 
 
@@ -857,7 +991,18 @@ For example: `@constrain dh test x .≥ 3`
 
 **TODO** This still isn't working right.  Will probably have to wait for v0.5.
 
-<a id='DatasToolbox.@constrainTest!' href='#DatasToolbox.@constrainTest!'>#</a>
+<a id='DatasToolbox.@constrain-Tuple{Any,Any}' href='#DatasToolbox.@constrain-Tuple{Any,Any}'>#</a>
+**`DatasToolbox.@constrain`** &mdash; *Macro*.
+
+
+
+```
+@constrain(df, expr)
+```
+
+Constrains the dataframe to rows for which `expr` evaluates to `true`.  `expr` should specify columns with column names written as symbols.  For example, to do `(a ∈ A) > M` one should write `:A .> M`.
+
+<a id='DatasToolbox.@constrainTest!-Tuple{Any,Any}' href='#DatasToolbox.@constrainTest!-Tuple{Any,Any}'>#</a>
 **`DatasToolbox.@constrainTest!`** &mdash; *Macro*.
 
 
@@ -870,7 +1015,7 @@ Constrains the test dataframe to satisfy the provided constriant.
 
 Input should be in the form of ColumnName relation value.  For example, `x .> 3` imposes `df[:x] .> 3`.
 
-<a id='DatasToolbox.@constrainTrain!' href='#DatasToolbox.@constrainTrain!'>#</a>
+<a id='DatasToolbox.@constrainTrain!-Tuple{Any,Any}' href='#DatasToolbox.@constrainTrain!-Tuple{Any,Any}'>#</a>
 **`DatasToolbox.@constrainTrain!`** &mdash; *Macro*.
 
 
@@ -883,7 +1028,7 @@ Constrains the training dataframe to satisfy the provided constraint.
 
 Input should be in the form of ColumnName relation value.  For example `x .> 3` imposes `df[:x] .> 3`.
 
-<a id='DatasToolbox.@pyslice' href='#DatasToolbox.@pyslice'>#</a>
+<a id='DatasToolbox.@pyslice-Tuple{Any}' href='#DatasToolbox.@pyslice-Tuple{Any}'>#</a>
 **`DatasToolbox.@pyslice`** &mdash; *Macro*.
 
 
@@ -894,7 +1039,7 @@ Input should be in the form of ColumnName relation value.  For example `x .> 3` 
 
 Gets a slice of a python object.  Does not shift indices.
 
-<a id='DatasToolbox.@split!' href='#DatasToolbox.@split!'>#</a>
+<a id='DatasToolbox.@split!-Tuple{Any,Any}' href='#DatasToolbox.@split!-Tuple{Any,Any}'>#</a>
 **`DatasToolbox.@split!`** &mdash; *Macro*.
 
 
