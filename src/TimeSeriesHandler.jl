@@ -313,44 +313,104 @@ export trainOnMatrix
 
 
 """
-    generateSequence(predict::Function, dh::TimeSeriesHandler,
-                     seq_length::Integer=8; on_matrix::Bool=false)
-                    
-Uses the supplied prediction function to generate a sequence of a specified length.
-The sequence uses the end of the training dataset as initial input.
+    _check_and_reshape(lastX, on_matrix)
 
-Note that this only makes sense if the intersection between the input and output columns
-isn't ∅.  For now we enforce that they must be identical.
-
-If `on_matrix` is true, the prediction function will take a matrix as input rather than
-a rank-3 tensor.
-
-**TODO** Fix this so that it works for arbitrary input, output.
+Private method used by generateSequence.
 """
-function generateSequence{T}(predict::Function, dh::TimeSeriesHandler{T},
-                             seq_length::Integer=8;
-                             on_matrix::Bool=false)
-    @assert dh.colsInput == dh.colsOutput "Input and output columns much match."
-    testsize = (seq_length, length(dh.colsInput))     
-    lastX = reshape(convert(Array{T}, dh.dfTrain[(end-dh.seq_length+1):end, dh.colsInput]),
-                    (1, dh.seq_length, length(dh.colsInput)))
+function _check_and_reshape(lastX::Array, on_matrix::Bool)
     if on_matrix
         lastX_reshaped = reshape(lastX, (1, prod(size(lastX))))
     else
         lastX_reshaped = lastX
     end
+    lastX_reshaped
+end
+
+
+"""
+    _get_next_X(indim, outin_idx, yhat, newcols_funcs)
+
+Private method used by `generateSequence`.
+"""
+function _get_next_X!{T}(lastX::Array, yhat::Vector{T}, outin_idx::Vector)
+    for (i, idx) ∈ enumerate(outin_idx)
+        lastX[1, end, idx] = yhat[i]
+    end
+end
+
+function _get_next_X!{T}(lastX::Array, yhat::Vector{T}, outin_idx::Vector, newcol_funcs::Dict)
+    _get_next_X!(lastX, yhat, outin_idx)
+    for (n, f) ∈ newcol_funcs
+        lastX[1, end, n] = f(lastX[1, end-1, :])
+    end
+end
+
+function _get_next_X!{T}(lastX::Array, yhat::Vector{T}, outin_idx::Vector, 
+                         newcol_func::Function)
+    _get_next_X!(lastX, yhat, outin_idx)
+    dict = newcol_func(lastX[1, end-1, :])
+    for (n, x) ∈ dict
+        lastX[1, end, n] = x
+    end
+end
+
+
+"""
+    generateSequence(predict, dh, seq_length[, newcol_func; on_matrix=false])
+                    
+Uses the supplied prediction function `predict` to generate a sequence of length `seq_length`.
+The sequence uses the end of the training dataset as initial input.
+
+Note that this only makes sense when the output columns are a subset of the input columns.
+Each row of the sequence output matrix will have the same columns as the input matrix.
+
+If a function returning a dictionary or a dictionary of functions `newcol_func` is supplied,
+every time a new row of the input is generated, it will have columns specified by 
+`newcol_func`.  The dictionary should have keys equal to the column numbers of columns
+in the input matrix and values equal to functions that take a `Vector` (the previous
+input row) and output a new value for the column number given by the key.  The column
+numbers correspond to the index of the column in the specified input columns.
+
+If `on_matrix` is true, the prediction function will take a matrix as input rather than
+a rank-3 tensor.
+"""
+# we keep this method separate for a very tiny amount of efficiency
+function generateSequence{T}(predict::Function, dh::TimeSeriesHandler{T},
+                             seq_length::Integer;
+                             on_matrix::Bool=false)
+    outin_idx = indexin(dh.colsOutput, dh.colsInput)
+    testsize = (seq_length, length(dh.colsInput))     
+    lastX = reshape(convert(Array{T}, dh.dfTrain[(end-dh.seq_length+1):end, dh.colsInput]),
+                    (1, dh.seq_length, length(dh.colsInput)))
+    lastX_reshaped = _check_and_reshape(lastX, on_matrix)
     yhat = Array{T}(testsize)
     for i in 1:testsize[1]
-        yhat[i, :] = predict(lastX_reshaped)
+        pred = predict(lastX_reshaped)
         lastX = circshift(lastX, (0, -1, 0)) 
-        lastX[1, end, :] = yhat[i, :]
-        if on_matrix
-            lastX_reshaped = reshape(lastX, (1, prod(size(lastX))))
-        else
-            lastX_reshaped = lastX
-        end
+        _get_next_X!(lastX, pred, outin_idx)
+        yhat[i, :] = lastX[1, end, :]
+        lastX_reshaped = _check_and_reshape(lastX, on_matrix)
     end
-    return yhat
+    yhat
+end
+
+function generateSequence{T}(predict::Function, dh::TimeSeriesHandler{T},
+                             seq_length::Integer, newcol_funcs::Union{Dict,Function};
+                             on_matrix::Bool=false)
+    outin_idx = indexin(dh.colsOutput, dh.colsInput)
+    testsize = (seq_length, length(dh.colsInput))
+    lastX = reshape(convert(Array{T}, dh.dfTrain[(end-dh.seq_length+1):end, dh.colsInput]),
+                    (1, dh.seq_length, length(dh.colsInput)))
+    lastX_reshaped = _check_and_reshape(lastX, on_matrix)
+    yhat = Array{T}(testsize)
+    for i ∈ 1:testsize[1]
+        pred = predict(lastX_reshaped)
+        lastX = circshift(lastX, (0, -1, 0))
+        _get_next_X!(lastX, pred, outin_idx, newcol_funcs)
+        yhat[i, :] = lastX[1, end, :]
+        lastX_reshaped = _check_and_reshape(lastX, on_matrix)
+    end
+    yhat
 end
 export generateSequence
 
