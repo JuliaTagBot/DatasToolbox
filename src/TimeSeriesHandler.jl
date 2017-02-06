@@ -332,20 +332,20 @@ end
 
 Private method used by `generateSequence`.
 """
-function _get_next_X!{T}(lastX::Array, yhat::Vector{T}, outin_idx::Vector)
+function _get_next_X!{T}(lastX::Array, yhat::Array{T}, outin_idx::Vector)
     for (i, idx) ∈ enumerate(outin_idx)
         lastX[1, end, idx] = yhat[i]
     end
 end
 
-function _get_next_X!{T}(lastX::Array, yhat::Vector{T}, outin_idx::Vector, newcol_funcs::Dict)
+function _get_next_X!{T}(lastX::Array, yhat::Array{T}, outin_idx::Vector, newcol_funcs::Dict)
     _get_next_X!(lastX, yhat, outin_idx)
     for (n, f) ∈ newcol_funcs
         lastX[1, end, n] = f(lastX[1, end-1, :])
     end
 end
 
-function _get_next_X!{T}(lastX::Array, yhat::Vector{T}, outin_idx::Vector, 
+function _get_next_X!{T}(lastX::Array, yhat::Array{T}, outin_idx::Vector, 
                          newcol_func::Function)
     _get_next_X!(lastX, yhat, outin_idx)
     dict = newcol_func(lastX[1, end-1, :])
@@ -362,7 +362,7 @@ Uses the supplied prediction function `predict` to generate a sequence of length
 The sequence uses the end of the training dataset as initial input.
 
 Note that this only makes sense when the output columns are a subset of the input columns.
-Each row of the sequence output matrix will have the same columns as the input matrix.
+
 
 If a function returning a dictionary or a dictionary of functions `newcol_func` is supplied,
 every time a new row of the input is generated, it will have columns specified by 
