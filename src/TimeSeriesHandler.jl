@@ -140,6 +140,9 @@ Note that this is silent if the dataframe is empty.
 use shared arrays.  Revisit in v0.5 with threads.
 """
 function assignTrain!(dh::TimeSeriesHandler; sort::Bool=true, parallel::Bool=false)
+    if isempty(dh.dfTrain)
+        throw(ErrorException("Trying to build variables from empty training dataframe."))
+    end
     # TODO, again parallel not currently working
     if parallel
         gad = _get_assign_data_parallel
@@ -163,6 +166,9 @@ one of the assigned prediction functions.
 Note that this is silent if the dataframe is empty.
 """
 function assignTest!(dh::TimeSeriesHandler; sort::Bool=true)
+    if isempty(dh.dfTest)
+        throw(ErrorException("Trying to build variables from empty test dataframe."))
+    end
     dh.X_test, dh.y_test = _get_assign_data(:dfTest, dh, sort=sort)
 end
 export assignTest!
