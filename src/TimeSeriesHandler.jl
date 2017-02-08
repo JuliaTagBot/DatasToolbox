@@ -126,7 +126,7 @@ end
 
 
 """
-    assignTrain!(dh::TimeSeriesHandler; sort::Bool=true, parallel::Bool=false)
+    assignTrain!(dh[, df; sort=true, parallel=false])
 
 Assigns the training data.  X output will be of shape (samples, seq_length, seq_width).
 If `sort` is true, will sort the dataframe first.  One should be extremely careful if
@@ -134,7 +134,9 @@ If `sort` is true, will sort the dataframe first.  One should be extremely caref
 workers, not threads).  This is useful because this data manipulation is complicated and
 potentially slow.
 
-Note that this is silent if the dataframe is empty.
+If a dataframe is provided, data will be assigned from it.  Alternatively, one can provide
+a vector of dataframes.  This is useful because sequences which cross the boundaries
+of the dataframes will *not* be created.
 
 **TODO** I'm pretty sure the parallel version isn't working right because it doesn't
 use shared arrays.  Revisit in v0.5 with threads.
@@ -151,25 +153,45 @@ function assignTrain!(dh::TimeSeriesHandler; sort::Bool=true, parallel::Bool=fal
     end
     dh.X_train, dh.y_train = gad(:dfTrain, dh, sort=sort)
 end
+
+function assignTrain!(dh::TimeSeriesHandler, df::AbstractDataFrame;
+                      sort::Bool=true, parallel::Bool=false)
+    dh.dfTrain = df
+    assignTrain!(dh, sort=sort, parallel=parallel)
+end
+
+function assignTrain!{DFT<:AbstractDataFrame}(dh::TimeSeriesHandler, dfs::Vector{DFT}; 
+                                              sort::Bool=true)
+    vcat_tuples(x,y) = vcat(x[1], y[1]), vcat(x[2], y[2]) 
+    dh.X_train, dh.y_train = mapreduce(vcat_tuples, dfs) do df
+        dh.dfTrain = df
+        _get_assign_data(:dfTrain, dh, sort=sort) 
+    end
+end
 export assignTrain!
 
 
 """
-    assignTest!(dh::TimeSeriesHandler; sort::Bool=true)
+    assignTest!(dh[, df; sort=true])
 
 Assigns the test data.  X output will be of shape (samples, seq_length, seq_width).
 One should be extremely careful if not sorting.
 
+If a dataframe is provided, data will be assigned from it.
+
 Note that in the time series case this isn't very useful.  One should instead use
 one of the assigned prediction functions.
-
-Note that this is silent if the dataframe is empty.
 """
 function assignTest!(dh::TimeSeriesHandler; sort::Bool=true)
     if isempty(dh.dfTest)
         throw(ErrorException("Trying to build variables from empty test dataframe."))
     end
     dh.X_test, dh.y_test = _get_assign_data(:dfTest, dh, sort=sort)
+end
+
+function assignTest!(dh::TimeSeriesHandler, df::AbstractDataFrame; sort::Bool=true)
+    dh.dfTest = df
+    assignTest!(dh, sort=sort)
 end
 export assignTest!
 
