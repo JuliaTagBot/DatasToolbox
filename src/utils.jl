@@ -138,20 +138,43 @@ export outer
 
 
 """
+    _info_expr(message, code)
+
+Private method used by `@info`.
+"""
+function _info_expr(message::String, code::Union{Expr,Symbol})
+    quote
+        info(string("Executing ", $message, " ..."))
+        $code
+        info(string("Done executing ", $message, " ..."))
+    end
+end
+
+"""
+    _infotime_expr(message, code)
+
+Private method used by `@infotime`.
+"""
+function _infotime_expr(message::String, code::Union{Expr,Symbol})
+    quote
+        info(string("Executing ", $message, " ..."))
+        @time $code
+        info(string("Done executing ", $message, " ..."))
+    end
+end
+
+"""
     @info code
 
 Executes code sandwhiched between informative info messages telling the user that the
 code is being executed.
 """
+macro info(message::String, code)
+    esc(_info_expr(message, code))
+end
 macro info(code)
-    code_string = string(code)
-    code_string = code_string[1:min(32, length(code_string))]
-    esc(quote
-        codestring = $code_string
-        info("Executing `$codestring` ...")
-        $code
-        info("Done executing `$codestring` ...")
-    end)
+    message = string('`', code, '`')
+    esc(_info_expr(message, code))
 end
 export @info
 
@@ -162,15 +185,12 @@ export @info
 Executes code sandwhiched between informative info messages telling the user that the code
 is being executed, while applying the `@time` macro to the code.
 """
+macro infotime(message::String, code)
+    esc(_infotime_expr(message, code))
+end
 macro infotime(code)
-    code_string = string(code)
-    code_string = code_string[1:min(32, length(code_string))]
-    esc(quote
-        codestring = $code_string
-        info("Executing `$codestring` ...")
-        @time $code
-        info("Done executing `$codestring` ...")
-    end)
+    message = string('`', code, '`')
+    esc(_infotime_expr(message, code))
 end
 export @infotime
 
