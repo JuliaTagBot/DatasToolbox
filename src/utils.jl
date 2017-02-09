@@ -137,3 +137,41 @@ end
 export outer
 
 
+"""
+    @info code
+
+Executes code sandwhiched between informative info messages telling the user that the
+code is being executed.
+"""
+macro info(code)
+    code_string = string(code)
+    code_string = code_string[1:min(32, length(code_string))]
+    esc(quote
+        codestring = $code_string
+        info("Executing `$codestring` ...")
+        $code
+        info("Done executing `$codestring` ...")
+    end)
+end
+export @info
+
+
+"""
+    @infotime code
+
+Executes code sandwhiched between informative info messages telling the user that the code
+is being executed, while applying the `@time` macro to the code.
+"""
+macro infotime(code)
+    code_string = string(code)
+    code_string = code_string[1:min(32, length(code_string))]
+    esc(quote
+        codestring = $code_string
+        info("Executing `$codestring` ...")
+        @time $code
+        info("Done executing `$codestring` ...")
+    end)
+end
+export @infotime
+
+
