@@ -146,7 +146,7 @@ function _info_expr(message::String, code::Union{Expr,Symbol})
     quote
         info(string("Executing ", $message, " ..."))
         $code
-        info(string("Done executing ", $message, " ..."))
+        info(string("Done executing ", $message, " ."))
     end
 end
 
@@ -159,7 +159,7 @@ function _infotime_expr(message::String, code::Union{Expr,Symbol})
     quote
         info(string("Executing ", $message, " ..."))
         @time $code
-        info(string("Done executing ", $message, " ..."))
+        info(string("Done executing ", $message, " ."))
     end
 end
 
