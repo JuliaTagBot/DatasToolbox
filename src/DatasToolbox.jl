@@ -3,10 +3,14 @@ __precompile__(true)
 module DatasToolbox
 
 
-using DataFrames
+using Reexport
+
+@reexport using DataFrames
+
 using DataFramesMeta
 using Feather
 using PyCall
+
 
 # explicit imports for overriding base
 import Base.serialize
