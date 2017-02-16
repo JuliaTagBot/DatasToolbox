@@ -324,11 +324,11 @@ _get_y_interval(y::Matrix, r::UnitRange) = y[r, :]
 
 
 """
-    subMatricesByClass(X, y, ncol)
+    subMatricesByClass(X[, y], ncol)
 
-Breaks the arrays `X` and `y` into dictionaries of `class=>submatrix` pairs where `class`
-is one of the distinct values of the column `ncol` of `X` and `submatrix` is the range
-of rows of `X` or `y` where `X[:,ncol]` has the value `class`.
+Breaks the arrays `X` and `y` (optional) into dictionaries of `class=>submatrix` 
+pairs where `class` is one of the distinct values of the column `ncol` of `X` and 
+`submatrix` is the range of rows of `X` or `y` where `X[:,ncol]` has the value `class`.
 
 This function is intended for breaking up training and test sets to be used with sets of
 different models.
@@ -348,6 +348,17 @@ function subMatricesByClass{T,U}(X::Matrix{T}, y::U, ncol::Integer)
         ydict[k] = _get_y_interval(y, v[1]:v[2])
     end
     Xdict, ydict
+end
+
+function subMatricesByClass{T}(X::Matrix{T}, ncol::Integer)
+    order = sortperm(X[:, ncol])
+    X = X[order, :]
+    bdict = findBoundaryDict(X, ncol, check_sort=false)
+    Xdict = Dict{T,Matrix{T}}();  sizehint!(Xdict, length(bdict))
+    for (k, v) ∈ bdict
+        Xdict[k] = X[v[1]:v[2], :]
+    end
+    Xdict
 end
 export subMatricesByClass
 
