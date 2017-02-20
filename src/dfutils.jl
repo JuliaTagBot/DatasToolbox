@@ -740,3 +740,77 @@ end
 export getCategoryVector
 
 
+"""
+    getUnwrappedColumnElTypes(df[, cols=[]])
+
+Get the element types of columns in a dataframe.  If the element types are `Nullable`, 
+instead give the `eltype` of the `Nullable`.  If `cols=[]` this will be done for
+all columns in the dataframe.
+"""
+function getUnwrappedColumnElTypes(df::DataFrame, cols::Vector{Symbol}=Symbol[])
+    if length(cols) == 0
+        cols = names(df)
+    end
+    [et <: Nullable ? eltype(et) : et for et ∈ eltypes(df[cols])]
+end
+export getUnwrappedColumnElTypes
+
+
+"""
+    getMatrixDict([T,] df, keycols, datacols)
+
+Gets a dictionary the keys of which are the keys of a groupby of `df` by the columns
+`keycols` and the values of which are the matrices produced by taking `sdf[datacols]`
+of each `SubDataFrame` `sdf` in the groupby.  Note that the keys are always tuples
+even if `keycols` only has one element.
+
+If a type `T` is provided, the output matrices will be of type `Matrix{T}`.
+"""
+function getMatrixDict(df::DataFrame, keycols::Vector{Symbol}, datacols::Vector{Symbol})
+    keycoltypes = getUnwrappedColumnElTypes(df, keycols)
+    dict = Dict{Tuple{keycoltypes...},Matrix}()
+    for sdf ∈ groupby(df, keycols)
+        key = tuple(convert(Array{Any}, sdf[1, keycols])...)
+        dict[key] = convert(Array, sdf[datacols])
+    end
+    dict
+end
+
+function getMatrixDict{T}(::Type{T}, gdf::GroupedDataFrame, keycols::Vector{Symbol},
+                          datacols::Vector{Symbol})
+    keycoltypes = getUnwrappedColumnElTypes(gdf.parent, keycols)
+    dict = Dict{Tuple{keycoltypes...},Matrix{T}}()
+    for sdf ∈ gdf
+        key = tuple(convert(Array{Any}, sdf[1, keycols])...)
+        dict[key] = convert(Array{T}, sdf[datacols])
+    end
+    dict
+end
+
+function getMatrixDict{T}(::Type{T}, gdf::GroupedDataFrame, keycols::Vector{Symbol},
+                          Xcols::Vector{Symbol}, ycols::Vector{Symbol})
+    keycoltypes = getUnwrappedColumnElTypes(gdf.parent, keycols)
+    Xdict = Dict{Tuple{keycoltypes...},Matrix{T}}()
+    ydict = Dict{Tuple{keycoltypes...},Matrix{T}}()
+    for sdf ∈ gdf
+        key = tuple(convert(Array{Any}, sdf[1, keycols])...)
+        Xdict[key] = convert(Array{T}, sdf[Xcols])
+        ydict[key] = convert(Array{T}, sdf[ycols])
+    end
+    Xdict, ydict
+end
+
+function getMatrixDict{T}(::Type{T}, df::DataFrame, keycols::Vector{Symbol},
+                          datacols::Vector{Symbol})
+    getMatrixDict(T, groupby(df, keycols), keycols, datacols)
+end
+
+# this version is used by grouped dataframe
+function getMatrixDict{T}(::Type{T}, df::DataFrame, keycols::Vector{Symbol},
+                          Xcols::Vector{Symbol}, ycols::Vector{Symbol})
+    getMatrixDict(T, groupby(df, keycols), keycols, Xcols, ycols)
+end
+
+export getMatrixDict
+
+

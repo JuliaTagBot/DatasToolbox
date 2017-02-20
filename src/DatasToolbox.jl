@@ -19,6 +19,7 @@ import Base.shuffle!
 import Base.convert
 import Base.normalize!
 import Base.Dict
+import Base.keys
 
 # the following are python imports that get used in various places
 const PyPickle = PyNULL()
@@ -39,6 +40,7 @@ include("tsutils.jl")
 include("utils.jl")
 include("DataHandler.jl")
 include("TimeSeriesHandler.jl")
+include("GroupedDataHandler.jl")
 
 
 

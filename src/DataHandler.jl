@@ -23,13 +23,13 @@ type DataHandler{T} <: AbstractDH{T}
     # dataframe where all data is kept
     df::DataFrame
 
-    colsInput::Array{Symbol, 1}
-    colsOutput::Array{Symbol, 1}
+    colsInput::Vector{Symbol}
+    colsOutput::Vector{Symbol}
 
-    colsNormalize::Array{Symbol, 1}
+    colsNormalize::Vector{Symbol}
 
-    mu::Array{T, 1}
-    norm::Array{T, 1}
+    mu::Vector{T}
+    norm::Vector{T}
     userange::Bool
 
     # training data, is a subset of df
@@ -63,29 +63,32 @@ type DataHandler{T} <: AbstractDH{T}
     automatically drops all rows containing null values.
     """
     function DataHandler(df::DataFrame; testfrac::AbstractFloat=0.0, shuffle::Bool=false,
-                         input_cols::Array{Symbol}=Symbol[], 
-                         output_cols::Array{Symbol}=Symbol[],
-                         normalize_cols::Array{Symbol}=Symbol[],
+                         input_cols::Vector{Symbol}=Symbol[], 
+                         output_cols::Vector{Symbol}=Symbol[],
+                         normalize_cols::Vector{Symbol}=Symbol[],
                          assign::Bool=false,
                          userange::Bool=false)
-        @assert sum(!complete_cases(df)) == 0 "DataHandler only accepts complete dataframes."
+        if sum(!complete_cases(df)) ≠ 0
+            throw(ArgumentError("DataHandler only accepts complete dataframes."))
+        end
         ndf = copy(df)
         # TODO convert to all non-nullable arrays!!!
-        complete_cases!(ndf)
         o = new(ndf, input_cols, output_cols, normalize_cols)
         o.userange = userange
         split!(o, testfrac, shuffle=shuffle, assign=assign)
         computeNormalizeParameters!(o, dataset=:dfTrain)
         if canNormalize(o)
             normalizeTrain!(o)
-            if size(o.dfTest)[1] > 0 normalizeTest!(o) end
+            size(o.dfTest,1) > 0 && normalizeTest!(o)
         end
-        return o
+        o
     end
 end
 export DataHandler
 
 
+# TODO all of this normalization stuff should be on the estimator side. 
+# get rid of it and make a good framework for doing this with estimators
 """
     computeNormalizeParameters!{T}(dh::AbstractDH{T}; dataset::Symbol=:dfTrain)
 
@@ -145,6 +148,7 @@ function normalize!{T}(dh::AbstractDH{T}; dataset::Symbol=:dfTrain)
         error("Trying to normalize before parameters have been computed.")
     end
     df = getfield(dh, dataset)
+    # note that this does something because these are not deep copies
     for (i, col) in enumerate(dh.colsNormalize)
         dfcol = dropnull(df[col])
         dfcol = (dfcol - dh.mu[i])./dh.norm[i]
@@ -185,9 +189,7 @@ export unnormalize!
 
 Shuffles the main dataframe of the DataHandler.
 """
-function shuffle!(dh::AbstractDH)
-    shuffle!(dh.df)
-end
+shuffle!(dh::AbstractDH) = shuffle!(dh.df)
 export shuffle!
 
 
@@ -195,16 +197,16 @@ export shuffle!
     assignTrain!(dh::AbstractDH)
 
 Assigns the training data in the data handler so it can be retrieved in proper form.
-
-Note that this is silent if the training dataframe is empty.
 """
 function assignTrain!{T}(dh::AbstractDH{T})
-    if isempty(dh.dfTrain) return end
+    if isempty(dh.dfTrain)
+        throw(ErrorException("Attempting to assign data from empty training dataframe."))
+    end
     X = convert(Array{T}, dh.dfTrain[:, dh.colsInput])
     y = convert(Array{T}, dh.dfTrain[:, dh.colsOutput])
     dh.X_train = X
     dh.y_train = y
-    return X, y
+    X, y
 end
 export assignTrain!
 
@@ -213,16 +215,16 @@ export assignTrain!
     assignTest!(dh::AbstractDH)
 
 Assigns the test data in the data handler.
-
-Note that this is silent if the test dataframe is empty.
 """
 function assignTest!{T}(dh::AbstractDH{T})
-    if isempty(dh.dfTest) return end
+    if isempty(dh.dfTest)
+        throw(ErrorException("Attempting to assign data from empty test dataframe."))
+    end
     X = convert(Array{T}, dh.dfTest[:, dh.colsInput])
     y = convert(Array{T}, dh.dfTest[:, dh.colsOutput])
     dh.X_test = X
     dh.y_test = y
-    return X, y
+    X, y
 end
 export assignTest!
 
@@ -250,7 +252,7 @@ If `flatten`, attempts to flatten `y`.
 function getTrainData(dh::AbstractDH; flatten::Bool=false)
     X, y = dh.X_train, dh.y_train
     if flatten
-        @assert size(y)[2] == 1 "Attempted to flatten rank-2 array."
+        @assert size(y,2) == 1 "Attempted to flatten rank-2 array."
         y = squeeze(y, 2)
     end
     return X, y    
@@ -290,8 +292,8 @@ function split!(dh::AbstractDH, index::Integer; assign::Bool=true)
     else
         dh.dfTest = dh.df[(index+1):end, :]
     end
-    if assign assign!(dh) end
-    return
+    assign && assign!(dh)
+    nothing
 end
 export split!
 
@@ -308,7 +310,7 @@ function split!(dh::AbstractDH, testfrac::AbstractFloat; shuffle::Bool=false,
     if shuffle shuffle!(dh) end
     index = convert(Int64, round((1. - testfrac)*size(dh.df)[1]))
     split!(dh, index, assign=assign)
-    return 
+    nothing
 end
 export split!
 
@@ -376,6 +378,8 @@ export @split!
 
 
 """
+## `DataHandler`
+
     getTestAnalysisData(dh::AbstractDH, ŷ::Array; names::Vector{Symbol}=Symbol[],
                         squared_error::Bool=true)
 
@@ -394,22 +398,22 @@ function getTestAnalysisData(dh::AbstractDH, ŷ::Array; names::Vector{Symbol}=S
     if length(size(ŷ)) == 1
         ŷ = reshape(ŷ, (length(ŷ), 1))
     end
-    @assert size(ŷ)[2] == length(dh.colsOutput) ("Supplied array must have same number of 
+    @assert size(ŷ,2) == length(dh.colsOutput) ("Supplied array must have same number of 
                                                   columns as the handler's output.")
     if length(names) == 0
-        names = [Symbol(string(col)*"_hat") for col in dh.colsOutput]
+        names = [Symbol(string(col, "_hat")) for col in dh.colsOutput]
     end
     @assert length(dh.colsOutput) == length(names) ("Wrong number of provided names.")
     # if ŷ is short it is assumed to correspond to begining of dataframe, useful for 
     # time series where only a partial sequence has been generated
     df = dh.dfTest[1:size(ŷ)[1], :]
-    for (idx, name) in enumerate(names)
+    for (idx, name) ∈ enumerate(names)
         df[name] = ŷ[:, idx]
         orig_col = convert(Vector, df[dh.colsOutput[idx]])
         err = ŷ[:, idx] - orig_col
-        df[Symbol(string(name)*"_Error")] = err
+        df[Symbol(string(name, "_Error"))] = err
         if squared_error
-            df[Symbol(string(name)*"_Error²")] = err.^2
+            df[Symbol(string(name, "_Error²"))] = err.^2
         end
     end
     df
