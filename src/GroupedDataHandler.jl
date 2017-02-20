@@ -73,19 +73,13 @@ end
 export keytuple
 
 
-function _fill_keys_vector!(o::Vector, gdh::GroupedDataHandler)
-    by(gdh.df, gdh.colsClass) do sdf
-        push!(o, keytuple(sdf, gdh.colsClass))
-    end
-end
-
 function keys{T}(gdh::GroupedDataHandler{T})
     if isdefined(gdh, :keys)
         return gdh.keys
     end
-    eltypes = getUnwrappedColumnElTypes(gdh.df, gdh.colsClass)
-    o = Vector{Tuple{eltypes...}}(0)
-    _fill_keys_vector!(o, gdh)
+    o = mapreduce(vcat, groupby(gdh.df, gdh.colsClass)) do sdf
+        [keytuple(sdf, gdh.colsClass)]
+    end
     o
 end
 
