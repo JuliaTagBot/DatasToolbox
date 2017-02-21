@@ -73,6 +73,10 @@ type DataHandler{T} <: AbstractDH{T}
         end
         ndf = copy(df)
         # TODO convert to all non-nullable arrays!!!
+        intersection = input_cols ∩ output_cols
+        if length(intersection) ≠ 0
+            warn("Estimator input and output both contain $intersection.")
+        end
         o = new(ndf, input_cols, output_cols, normalize_cols)
         o.userange = userange
         split!(o, testfrac, shuffle=shuffle, assign=assign)
