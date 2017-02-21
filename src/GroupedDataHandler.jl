@@ -173,7 +173,7 @@ function _replace_values_into_grouped{T}(gp::GroupedDataFrame, dict::Dict, ::Typ
     newcols = DataFrame([T for n ∈ new_col_names], new_col_names, size(gp.parent, 1))
     for (start, stop) ∈ zip(gp.starts, gp.ends)
         key = keytuple(gp.parent, keycols, gp.idx[start])
-        y = dict[key]
+        y = get(dict, key, NullableArray(T, length(start:stop), length(new_col_names)))
         for (i, idx) ∈ enumerate(gp.idx[start:stop])
             for j ∈ 1:length(new_col_names)
                 newcols[idx, j] = y[i, j]
@@ -199,12 +199,14 @@ function getTestAnalysisData{T}(gdh::GroupedDataHandler{T}, ŷ::Dict;
 
     df = hcat(df, newcols)
 
+    # note that it's now possible to have nulls
     for (idx, name) ∈ enumerate(names)
-        orig_col = convert(Vector, df[gdh.colsOutput[idx]])
-        err = convert(Vector, df[:, name]) - orig_col
+        orig_col = df[gdh.colsOutput[idx]]
+        err = df[name] - orig_col
         df[Symbol(string(name, "_Error"))] = err
         if squared_error
-            df[Symbol(string(name, "_Error²"))] = err.^2
+            # they haven't written the ^ operator for NullableArrays
+            df[Symbol(string(name, "_Error²"))] = err .* err
         end
     end
 
