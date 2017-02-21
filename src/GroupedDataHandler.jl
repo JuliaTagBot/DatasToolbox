@@ -192,7 +192,7 @@ function getTestAnalysisData{T}(gdh::GroupedDataHandler{T}, ŷ::Dict;
     ŷ = _fix_flattened_matrix_dict(T, ŷ)
 
     if length(names) == 0
-        names = [Symbol(string(col, "_hat")) for col ∈ gdh.colsOutput]
+        names = getDefaultTestAnalysisColumnNames(gdh)
     end
 
     newcols = _replace_values_into_grouped(gdh.dfTest_grp, ŷ, T, names, gdh.colsClass)
@@ -212,6 +212,56 @@ function getTestAnalysisData{T}(gdh::GroupedDataHandler{T}, ŷ::Dict;
 
     df
 end
+
+
+function getGroupedTestAnalysisData(data::DataFrame, keycols::Vector{Symbol},
+                                    names::Vector{Symbol}; 
+                                    squared_error::Bool=true)
+    by(data, keycols) do sdf
+        agg = DataFrame()
+        if isempty(sdf) 
+            return agg
+        end
+        for name ∈ names
+            errname = Symbol(string(name, "_Error"))
+            agg[Symbol(string(errname, "_mean"))] = mean(dropnull(sdf[errname]))
+            agg[Symbol(string(errname, "_std"))] = std(dropnull(sdf[errname]))
+            if squared_error
+                err2name = Symbol(string(name, "_Error²"))
+                agg[Symbol(string(err2name, "_mean"))] = mean(dropnull(sdf[err2name]))
+                agg[Symbol(string(err2name, "_std"))] = std(dropnull(sdf[err2name]))
+            end
+        end
+        agg
+    end
+end
+
+function getGroupedTestAnalysisData(dh::AbstractDH, data::DataFrame, keycols::Vector{Symbol};
+                                    names::Vector{Symbol}=Symbol[],
+                                    squared_error::Bool=true)
+    if length(names) == 0
+        names = getDefaultTestAnalysisColumnNames(dh)
+    end
+    getGroupedTestAnalysisData(data, keycols, names, squared_error=squared_error)
+end
+
+function getGroupedTestAnalysisData(gdh::GroupedDataHandler, data::DataFrame;
+                                    names::Vector{Symbol}=Symbol[],
+                                    squared_error::Bool=true)
+    getGroupedTestAnalysisData(gdh, data, gdh.colsClass, names=names, 
+                               squared_error=squared_error)
+end
+
+function getGroupedTestAnalysisData(gdh::GroupedDataHandler, ŷ::Dict; 
+                                    names::Vector{Symbol}=Symbol[],
+                                    squared_error::Bool=true)
+    if length(names) == 0
+        names = getDefaultTestAnalysisColumnNames(gdh)
+    end
+    data = getTestAnalysisData(gdh, ŷ, names=names, squared_error=squared_error)
+    getGroupedTestAnalysisData(data, gdh.colsClass, names, squared_error=squared_error)
+end
+export getGroupedTestAnalysisData
 
 
 

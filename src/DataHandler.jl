@@ -377,6 +377,11 @@ end
 export @split!
 
 
+function getDefaultTestAnalysisColumnNames(dh::AbstractDH)
+    [Symbol(string(col, "_hat")) for col ∈ dh.colsOutput]
+end
+
+
 """
 ## `DataHandler`
 
@@ -401,8 +406,9 @@ function getTestAnalysisData(dh::AbstractDH, ŷ::Array; names::Vector{Symbol}=S
     @assert size(ŷ,2) == length(dh.colsOutput) ("Supplied array must have same number of 
                                                   columns as the handler's output.")
     if length(names) == 0
-        names = [Symbol(string(col, "_hat")) for col in dh.colsOutput]
+        names = getDefaultTestAnalysisColumnNames(dh)
     end
+
     @assert length(dh.colsOutput) == length(names) ("Wrong number of provided names.")
     # if ŷ is short it is assumed to correspond to begining of dataframe, useful for 
     # time series where only a partial sequence has been generated
