@@ -214,6 +214,18 @@ function getTestAnalysisData{T}(gdh::GroupedDataHandler{T}, ŷ::Dict;
 end
 
 
+"""
+    getGroupedTestAnalysisData(data, keycols[; names=[], squared_error=true])
+    getGroupedTestAnalysisData(dh, data, keycols[; names=[], squared_error=true])
+    getGroupedTestAnalysisData(gdh, data[; names=[], squared_error=true])
+    getGroupedTestAnalysisData(gdh, ŷ[; names=[], squared_error=true])
+
+Groups the output of `getTestAnalysisData` by the columns `keycols`.  This is particularly
+useful for `GroupedDataHandler` where a typical use case is applying different estimators
+to different subsets of the data.  One can supply the output `getTestAnalysisData` as
+`data` or pass a `GroupedDataHandler` together with an output dictionary `ŷ`, in which
+case all the tables will be generated for you.
+"""
 function getGroupedTestAnalysisData(data::DataFrame, keycols::Vector{Symbol},
                                     names::Vector{Symbol}; 
                                     squared_error::Bool=true)
@@ -222,6 +234,7 @@ function getGroupedTestAnalysisData(data::DataFrame, keycols::Vector{Symbol},
         if isempty(sdf) 
             return agg
         end
+        agg[:NDataPoints] = size(sdf,1)
         for name ∈ names
             errname = Symbol(string(name, "_Error"))
             agg[Symbol(string(errname, "_mean"))] = mean(dropnull(sdf[errname]))
