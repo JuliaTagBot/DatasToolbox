@@ -80,7 +80,7 @@ to Python objects.  If `fixtypes`, this will attempt to convert any column with 
 function convertPyDF(pydf::PyObject; fixtypes::Bool=true)::DataFrame
     df = DataFrame()
     for col in pydf[:columns]
-        df[Symbol(col)] = convertPyColumn(get(pydf, col))
+        df[Symbol(col)] = convertPyColumn(get(pydf, PyObject, col))
     end
     if fixtypes fixColumnTypes!(df) end
     return df
@@ -159,14 +159,15 @@ attempt to convert the object to a Julia dataframe with the flag
 `fixtypes` (see `convertPyDF`).
 """
 function unpickle(filename::String)::PyObject
-    f = pyeval("open('$filename', 'rb')")
+    f = py"open($filename, 'rb')"
     pyobj = PyPickle[:load](f)
 end
 
-function unpickle(dtype::Type{DataFrame}, filename::AbstractString;
+function unpickle(::Type{DataFrame}, filename::AbstractString;
                   fixtypes::Bool=true)::DataFrame
-    f = pyeval("open('$filename', 'rb')")
-    pydf = PyPickle[:load](f)
+    f = py"open($filename, 'rb')"
+    # TODO it may be more efficient to create this from a dictionary than to convert
+    pydf = pycall(PyPickle[:load], PyObject, f)
     df = convertPyDF(pydf, fixtypes=fixtypes)
 end
 export unpickle
