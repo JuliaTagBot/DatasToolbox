@@ -181,13 +181,13 @@ this will first convert it to a pandas dataframe.
 """
 function pickle(filename::String, object::Any)
     pyobject = PyObject(object)
-    f = pyeval("open('$filename', 'wb')")
+    f = py"open($filename, 'wb')"
     PyPickle[:dump](pyobject, f)
 end
 
 function pickle(filename::String, df::DataFrame)
     pydf = pandas(df)
-    f = pyeval("open('$filename', 'wb')")
+    f = py"open($filename, 'wb')"
     PyPickle[:dump](pydf, f)
 end
 export pickle
@@ -399,12 +399,12 @@ export applyCatConstraints
 Convert a dataframe to a pandas pyobject.
 """
 function pandas(df::DataFrame)::PyObject
-    pydf = PyPandas[:DataFrame]()
+    pydf = pycall(PyPandas[:DataFrame], PyObject)
     for col in names(df)
         pycol = [isnull(x) ? nothing : get(x) for x in df[col]]
         set!(pydf, string(col), pycol)
         # convert datetime to proper numpy type
-        if eltype(df[col]) == DateTime
+        if eltype(eltype(df[col])) == DateTime
             set!(pydf, string(col), 
                  get(pydf, string(col))[:astype]("<M8[ns]"))
         end
