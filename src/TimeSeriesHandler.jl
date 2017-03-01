@@ -391,7 +391,6 @@ The sequence uses the end of the training dataset as initial input.
 
 Note that this only makes sense when the output columns are a subset of the input columns.
 
-
 If a function returning a dictionary or a dictionary of functions `newcol_func` is supplied,
 every time a new row of the input is generated, it will have columns specified by 
 `newcol_func`.  The dictionary should have keys equal to the column numbers of columns
