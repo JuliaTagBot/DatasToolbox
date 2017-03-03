@@ -41,7 +41,6 @@ include("utils.jl")
 include("DataHandler.jl")
 include("TimeSeriesHandler.jl")
 include("GroupedDataHandler.jl")
-include("Anamnesis.jl")
 
 
 
