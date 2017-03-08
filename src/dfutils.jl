@@ -568,6 +568,7 @@ type is `NullableArray`, even if the original type of the column is not.
 """
 function nans2nulls{T}(col::NullableArray{T})::NullableArray
     # this is being done without lift because of bugs in NullableArrays
+    # haven't checked whether this bug still exists
     # map(x -> (isnan(x) ? Nullable{T}() : x), col, lift=true)
     map(col) do x
         if !isnull(x) && isnan(get(x))
@@ -718,7 +719,7 @@ end
 function getCategoryVector{T, U}(A::NullableVector{T}, vals::Vector{T}, ::Type{U}=Int64)
     # this is for efficiency
     valsdict = Dict{T, Void}(v=>nothing for v ∈ vals)
-    o = map(a -> a ∈ keys(valsdict), A, lift=true)
+    o = map(a -> a ∈ keys(valsdict), A)
     # these nested converts are the result of incomplete NullableArrays interface
     convert(Array{U}, convert(Array, o, 0))
 end
