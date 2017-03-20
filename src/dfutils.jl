@@ -55,7 +55,7 @@ Check to see if the dataframe `df` has any columns of type `Any` and attempt to 
 them to the proper types.  This can be called from `convertPyDF` with the option
 `fixtypes`.
 """
-function fixColumnTypes!(df::DataFrame)
+function fixColumnTypes!(df::DataTable)
     for col in names(df)
         if eltype(eltype(df[col])) ≠ Any continue end
         dtype = _inferColumnType(df[col])
@@ -77,8 +77,8 @@ Note that it is difficult to infer the correct types of columns which contain re
 to Python objects.  If `fixtypes`, this will attempt to convert any column with eltype
 `Any` to the proper type.
 """
-function convertPyDF(pydf::PyObject; fixtypes::Bool=true)::DataFrame
-    df = DataFrame()
+function convertPyDF(pydf::PyObject; fixtypes::Bool=true)::DataTable
+    df = DataTable()
     for col in pydf[:columns]
         df[Symbol(col)] = convertPyColumn(get(pydf, PyObject, col))
     end
@@ -104,12 +104,12 @@ export fixPyNones
 
 
 """
-    fixPyNones!(dtype::DataType, df::DataFrame, col::Symbol)
+    fixPyNones!(dtype::DataType, df::DataTable, col::Symbol)
 
 Attempts to convert a column of the dataframe to have eltype `dtype` while replacing all
 Python `None`s with `Nullable()`.
 """
-function fixPyNones!{T}(::Type{T}, df::DataFrame, col::Symbol)
+function fixPyNones!{T}(::Type{T}, df::DataTable, col::Symbol)
     df[col] = fixPyNones(T, df[col])
     return df
 end
@@ -117,12 +117,12 @@ export fixPyNones!
 
 
 """
-    fixPyNones!(df::DataFrame)
+    fixPyNones!(df::DataTable)
 
 Attempts to automatically convert all columns of a dataframe to have eltype `Any` while
 replacing all Python `None`s with `Nullable()`.
 """
-function fixPyNones!(df::DataFrame)
+function fixPyNones!(df::DataTable)
     for col in names(df)
         if eltype(df[col]) == PyObject
             fixPyNones!(Any, df, col)
@@ -154,7 +154,7 @@ end
     unpickle([dtype,] filename[, fixtypes=true])
 
 Deserializes a python pickle file and returns the object it contains.
-Additionally, if `DataFrame` is given as the first argument, will
+Additionally, if `DataTable` is given as the first argument, will
 attempt to convert the object to a Julia dataframe with the flag
 `fixtypes` (see `convertPyDF`).
 """
@@ -163,8 +163,8 @@ function unpickle(filename::String)::PyObject
     pyobj = PyPickle[:load](f)
 end
 
-function unpickle(::Type{DataFrame}, filename::AbstractString;
-                  fixtypes::Bool=true)::DataFrame
+function unpickle(::Type{DataTable}, filename::AbstractString;
+                  fixtypes::Bool=true)::DataTable
     f = py"open($filename, 'rb')"
     # TODO it may be more efficient to create this from a dictionary than to convert
     pydf = pycall(PyPickle[:load], PyObject, f)
@@ -177,7 +177,7 @@ export unpickle
     pickle(filename, object)
 
 Converts the provided object to a PyObject and serializes it in
-the python pickle format.  If the object provided is a `DataFrame`,
+the python pickle format.  If the object provided is a `DataTable`,
 this will first convert it to a pandas dataframe.
 """
 function pickle(filename::String, object::Any)
@@ -186,7 +186,7 @@ function pickle(filename::String, object::Any)
     PyPickle[:dump](pyobject, f)
 end
 
-function pickle(filename::String, df::DataFrame)
+function pickle(filename::String, df::DataTable)
     pydf = pandas(df)
     f = py"open($filename, 'wb')"
     PyPickle[:dump](pydf, f)
@@ -195,11 +195,11 @@ export pickle
 
 
 """
-    shuffle!(df::DataFrame)
+    shuffle!(df::DataTable)
 
 Shuffles a dataframe in place.
 """
-function shuffle!(df::DataFrame)
+function shuffle!(df::DataTable)
     permutation = shuffle(collect(1:size(df)[1]))
     tdf = copyColumns(df)
     for i in 1:length(permutation)
@@ -242,14 +242,14 @@ export getDefaultCategoricalMapping
 
 
 """
-    numericalCategories!(otype::DataType, df::DataFrame, col::Symbol)
+    numericalCategories!(otype::DataType, df::DataTable, col::Symbol)
 
 Converts a categorical value in a column into a numerical variable of the given
 type.
 
 Returns the mapping.
 """
-function numericalCategories!{T}(::Type{T}, df::DataFrame, col::Symbol)
+function numericalCategories!{T}(::Type{T}, df::DataTable, col::Symbol)
     df[Symbol(string(col)*"_Orig")] = df[col]
     df[col], mapping = numericalCategories(T, df[col])
     return mapping
@@ -258,7 +258,7 @@ export numericalCategories!
 
 
 """
-    numericalCategories!(otype::DataType, df::DataFrame, cols::Array{Symbol}) 
+    numericalCategories!(otype::DataType, df::DataTable, cols::Array{Symbol}) 
 
 Converts categorical variables into numerical values for multiple columns in a
 dataframe.  
@@ -266,7 +266,7 @@ dataframe.
 **TODO** For now doesn't return mapping, may have to implement some type of 
 mapping type.
 """
-function numericalCategories!{T}(::Type{T}, df::DataFrame, cols::Array{Symbol})
+function numericalCategories!{T}(::Type{T}, df::DataTable, cols::Array{Symbol})
     for col in cols
         numericalCategories!(T, df, col)
     end
@@ -315,24 +315,24 @@ export convertNulls
 
 
 """
-    convertNulls!(df::DataFrame, cols::Vector{Symbol}, newvalue::Any)
+    convertNulls!(df::DataTable, cols::Vector{Symbol}, newvalue::Any)
 
-Convert all null values in columns of a DataFrame to a particular value.
+Convert all null values in columns of a DataTable to a particular value.
 
 There is also a method for passing a single column symbol, not as a vector.
 """
-function convertNulls!(df::DataFrame, cols::Vector{Symbol}, newvalue::Any)
+function convertNulls!(df::DataTable, cols::Vector{Symbol}, newvalue::Any)
     for col in cols
         df[col] = convertNulls(df[col], newvalue)
     end
     return
 end
-convertNulls!(df::DataFrame, col::Symbol, newvalue) = convertNulls!(df, [col], newvalue)
+convertNulls!(df::DataTable, col::Symbol, newvalue) = convertNulls!(df, [col], newvalue)
 export convertNulls!
 
 
 """
-    copyColumns(df::DataFrame)
+    copyColumns(df::DataTable)
 
 The default copy method for dataframes only copies one level deep, so basically it stores
 an array of columns.  If you assign elements of individual (column) arrays then, it can
@@ -340,14 +340,14 @@ make changes to references to those arrays that exist elsewhere.
 
 This method instead creates a new dataframe out of copies of the (column) arrays.
 
-This is not named copy due to the fact that there is already an explicit copy(::DataFrame)
+This is not named copy due to the fact that there is already an explicit copy(::DataTable)
 implementation in dataframes.
 
 Note that deepcopy is recursive, so this is *NOT* the same thing as deepcopy(df), which 
 copies literally everything.
 """
-function copyColumns(df::DataFrame)
-    ndf = DataFrame()
+function copyColumns(df::DataTable)
+    ndf = DataTable()
     for col in names(df)
         ndf[col] = copy(df[col])
     end
@@ -373,7 +373,7 @@ Note that this requires that the dictionary values are either `Vector` or `Funct
 Alternatively, instead of passing a `Dict` one can pass keywords, for example
 `applyCatConstraints(df, PID=[i for i in 21:24; -24])`.
 """
-function applyCatConstraints(dict::Dict, df::DataFrame)
+function applyCatConstraints(dict::Dict, df::DataTable)
     constr = Bool[true for i in 1:size(df)[1]]
     for (col, values) in dict
         constr &= if typeof(values) <: Vector
@@ -387,7 +387,7 @@ function applyCatConstraints(dict::Dict, df::DataFrame)
     return df[constr, :]
 end
 
-function applyCatConstraints(df::DataFrame; kwargs...)
+function applyCatConstraints(df::DataTable; kwargs...)
     dct = Dict(kwargs)
     applyCatConstraints(dct, df)
 end
@@ -399,8 +399,8 @@ export applyCatConstraints
 
 Convert a dataframe to a pandas pyobject.
 """
-function pandas(df::DataFrame)::PyObject
-    pydf = pycall(PyPandas[:DataFrame], PyObject)
+function pandas(df::DataTable)::PyObject
+    pydf = pycall(PyPandas[:DataTable], PyObject)
     for col in names(df)
         pycol = [isnull(x) ? nothing : get(x) for x in df[col]]
         set!(pydf, string(col), pycol)
@@ -462,7 +462,7 @@ Alternatively one can use keyword arguments instead of a `Dict`.
 Also, one can pass a function the arguments of which are elements of columns specified
 by `cols`.
 """
-function constrain{K<:Symbol, V<:Function}(df::AbstractDataFrame, constraints::Dict{K, V})::DataFrame
+function constrain{K<:Symbol, V<:Function}(df::AbstractDataTable, constraints::Dict{K, V})::DataTable
     keep = ones(Bool, size(df, 1))
     for (col, bfunc) ∈ constraints
         _colconstraints!(df[col], bfunc, keep)
@@ -470,14 +470,14 @@ function constrain{K<:Symbol, V<:Function}(df::AbstractDataFrame, constraints::D
     df[keep, :]
 end
 
-function constrain{K, V<:Array}(df::AbstractDataFrame, constraints::Dict{K, V})::DataFrame
+function constrain{K, V<:Array}(df::AbstractDataTable, constraints::Dict{K, V})::DataTable
     newdict = Dict(k=>(x -> x ∈ v) for (k, v) ∈ constraints)
     constrain(df, newdict)
 end
 
-constrain(df::AbstractDataFrame; kwargs...) = constrain(df, Dict(kwargs))
+constrain(df::AbstractDataTable; kwargs...) = constrain(df, Dict(kwargs))
 
-function constrain(df::AbstractDataFrame, cols::Vector{Symbol}, f::Function)
+function constrain(df::AbstractDataTable, cols::Vector{Symbol}, f::Function)
     keep = BitArray(size(df, 1))
     _dispatchConstrainFunc!(f, complete_cases(df[cols]), keep, (df[col] for col ∈ cols)...)
     df[keep, :]
@@ -531,16 +531,16 @@ export @constrain
 
 
 """
-    makeTestDF(dtypes...; nrows=10^4)
+    randomData(dtypes...; nrows=10^4)
 
 Creates a random dataframe with columns of types specified by `dtypes`.  This is useful
 for testing various dataframe related functionality.
 """
-function makeTestDF(dtypes::DataType...; nrows::Integer=10^4,
-                    names::Vector{Symbol}=Symbol[])::DataFrame
-    df = DataFrame()
+function randomData(dtypes::DataType...; nrows::Integer=10^4,
+                      names::Vector{Symbol}=Symbol[])::DataTable
+    df = DataTable()
     for (idx, dtype) in enumerate(dtypes)
-        col = Symbol(string(dtype)*string(idx))
+        col = Symbol(string("col_", idx))
         if dtype <: Real
             df[col] = rand(dtype, nrows)
         elseif dtype <: AbstractString
@@ -556,7 +556,7 @@ function makeTestDF(dtypes::DataType...; nrows::Integer=10^4,
     end
     return df
 end
-export makeTestDF
+export randomData
 
 
 """
@@ -583,12 +583,13 @@ function nans2nulls(col::Vector)::NullableArray
     nans2nulls(col)
 end
 
-function nans2nulls(df::DataFrame, col::Symbol)::NullableArray
+function nans2nulls(df::DataTable, col::Symbol)::NullableArray
     nans2nulls(df[col])
 end
 export nans2nulls
 
 
+# TODO: this will be changed once Feather.jl gets updated
 """
     featherWrite(filename, df[, overwrite=false])
 
@@ -598,21 +599,27 @@ is in development.
 If `overwrite`, this will delete the existing file first (an extra step taken to avoid some
 strange bugs).
 """
-function featherWrite(filename::AbstractString, df::DataFrame;
+function featherWrite(filename::AbstractString, df::DataFrames.DataFrame;
                       overwrite::Bool=false)::Void
     if isfile(filename)
         if !overwrite
-            # TODO why is this not printing the string correctly
             throw(SystemError("File already exists.  Use overwrite=true."))
         end
         rm(filename)     
     end
     Feather.write(filename, df)
-    return nothing
+    nothing
+end
+
+function featherWrite(filename::AbstractString, dt::DataTable;
+                      overwrite::Bool=false)::Void
+    featherWrite(filename, convert(DataFrames.DataFrame, dt), overwrite=overwrite)
 end
 export featherWrite
 
 
+# TODO these will also get changed once Feather gets updated
+# .... other parts of thsi might change in 0.6
 """
     convertWeakRefStrings(df)
     convertWeakRefStrings!(df)
@@ -623,8 +630,8 @@ performance.
 
 Note that this will no longer be necessary in Julia 0.6.
 """
-function convertWeakRefStrings(df::AbstractDataFrame)
-    odf = DataFrame()
+function convertWeakRefStrings(df::AbstractDataTable)
+    odf = DataTable()
     for col ∈ names(df)
         if eltype(df[col]) <: Nullable{Feather.WeakRefString{UInt8}}
             odf[col] = convert(NullableVector{String}, df[col])
@@ -635,7 +642,7 @@ function convertWeakRefStrings(df::AbstractDataFrame)
     odf
 end
 export convertWeakRefStrings
-function convertWeakRefStrings!(df::AbstractDataFrame)
+function convertWeakRefStrings!(df::AbstractDataTable)
     for col ∈ names(df)
         if eltype(df[col]) <: Nullable{Feather.WeakRefString{UInt8}}
             df[col] = convert(NullableVector{String}, df[col])
@@ -646,6 +653,7 @@ end
 export convertWeakRefStrings!
 
 
+# TODO: this will also get changed once Feather.jl gets updated
 """
     featherRead(filename[; convert_strings=true])
 
@@ -653,8 +661,9 @@ A wrapper for reading dataframes which are saved in feather files.  The purpose 
 wrapper is primarily for converting `WeakRefString` to `String`.  This will no longer
 be necessary in Julia 0.6.
 """
-function featherRead(filename::AbstractString; convert_strings::Bool=true)::DataFrame
-    df = Feather.read(filename)
+function featherRead(filename::AbstractString; convert_strings::Bool=true)::DataTable
+    df = convert(DataTable, Feather.read(filename))
+    # df = convert(DataTable, Feather.read(filename))
     if convert_strings
         convertWeakRefStrings!(df)
     end
@@ -696,7 +705,7 @@ function Dict{K, V}(keys::NullableVector{K}, values::NullableVector{V})::Dict
     return dict
 end
 
-function Dict(df::DataFrame, keycol::Symbol, valcol::Symbol)::Dict
+function Dict(df::DataTable, keycol::Symbol, valcol::Symbol)::Dict
     Dict(df[keycol], df[valcol])
 end
 export Dict
@@ -732,11 +741,11 @@ function getCategoryVector{T, U}(A::NullableVector{T}, val::T, ::Type{U}=Int64)
     getCategoryVector(A, [val], U)
 end
 
-function getCategoryVector{U}(df::AbstractDataFrame, col::Symbol, vals::Vector, ::Type{U}=Int64)
+function getCategoryVector{U}(df::AbstractDataTable, col::Symbol, vals::Vector, ::Type{U}=Int64)
     getCategoryVector(df[col], vals, U)
 end
 
-function getCategoryVector{U}(df::AbstractDataFrame, col::Symbol, val, ::Type{U}=Int64)
+function getCategoryVector{U}(df::AbstractDataTable, col::Symbol, val, ::Type{U}=Int64)
     getCategoryVector(df[col], [val], U)
 end
 export getCategoryVector
@@ -749,7 +758,7 @@ Get the element types of columns in a dataframe.  If the element types are `Null
 instead give the `eltype` of the `Nullable`.  If `cols=[]` this will be done for
 all columns in the dataframe.
 """
-function getUnwrappedColumnElTypes(df::DataFrame, cols::Vector{Symbol}=Symbol[])
+function getUnwrappedColumnElTypes(df::DataTable, cols::Vector{Symbol}=Symbol[])
     if length(cols) == 0
         cols = names(df)
     end
@@ -763,12 +772,12 @@ export getUnwrappedColumnElTypes
 
 Gets a dictionary the keys of which are the keys of a groupby of `df` by the columns
 `keycols` and the values of which are the matrices produced by taking `sdf[datacols]`
-of each `SubDataFrame` `sdf` in the groupby.  Note that the keys are always tuples
+of each `SubDataTable` `sdf` in the groupby.  Note that the keys are always tuples
 even if `keycols` only has one element.
 
 If a type `T` is provided, the output matrices will be of type `Matrix{T}`.
 """
-function getMatrixDict(df::DataFrame, keycols::Vector{Symbol}, datacols::Vector{Symbol})
+function getMatrixDict(df::DataTable, keycols::Vector{Symbol}, datacols::Vector{Symbol})
     keycoltypes = getUnwrappedColumnElTypes(df, keycols)
     dict = Dict{Tuple{keycoltypes...},Matrix}()
     for sdf ∈ groupby(df, keycols)
@@ -778,7 +787,7 @@ function getMatrixDict(df::DataFrame, keycols::Vector{Symbol}, datacols::Vector{
     dict
 end
 
-function getMatrixDict{T}(::Type{T}, gdf::GroupedDataFrame, keycols::Vector{Symbol},
+function getMatrixDict{T}(::Type{T}, gdf::GroupedDataTable, keycols::Vector{Symbol},
                           datacols::Vector{Symbol})
     keycoltypes = getUnwrappedColumnElTypes(gdf.parent, keycols)
     dict = Dict{Tuple{keycoltypes...},Matrix{T}}()
@@ -789,7 +798,7 @@ function getMatrixDict{T}(::Type{T}, gdf::GroupedDataFrame, keycols::Vector{Symb
     dict
 end
 
-function getMatrixDict{T}(::Type{T}, gdf::GroupedDataFrame, keycols::Vector{Symbol},
+function getMatrixDict{T}(::Type{T}, gdf::GroupedDataTable, keycols::Vector{Symbol},
                           Xcols::Vector{Symbol}, ycols::Vector{Symbol})
     keycoltypes = getUnwrappedColumnElTypes(gdf.parent, keycols)
     Xdict = Dict{Tuple{keycoltypes...},Matrix{T}}()
@@ -802,17 +811,61 @@ function getMatrixDict{T}(::Type{T}, gdf::GroupedDataFrame, keycols::Vector{Symb
     Xdict, ydict
 end
 
-function getMatrixDict{T}(::Type{T}, df::DataFrame, keycols::Vector{Symbol},
+function getMatrixDict{T}(::Type{T}, df::DataTable, keycols::Vector{Symbol},
                           datacols::Vector{Symbol})
     getMatrixDict(T, groupby(df, keycols), keycols, datacols)
 end
 
 # this version is used by grouped dataframe
-function getMatrixDict{T}(::Type{T}, df::DataFrame, keycols::Vector{Symbol},
+function getMatrixDict{T}(::Type{T}, df::DataTable, keycols::Vector{Symbol},
                           Xcols::Vector{Symbol}, ycols::Vector{Symbol})
     getMatrixDict(T, groupby(df, keycols), keycols, Xcols, ycols)
 end
 
 export getMatrixDict
+
+
+#==========================================================================================
+Conversions between DataTables and DataFrames
+==========================================================================================#
+"""
+    convertArray(array_type, a)
+
+Convert between `NullableArray`s and `DataArray`s.  The former is used by `DataTables` while
+the latter is used by `DataFrames`.
+
+Note that this is named `convertArray` rather than simply `convert` so as not to conflict
+with the existing definitions for `convert`.
+"""
+function convertArray{T,N}(::Type{DataArrays.DataArray}, v::NullableArray{T,N})
+    DataArrays.DataArray{T,N}(copy(v.values), BitArray(v.isnull))
+end
+
+function convertArray{T,N}(::Type{NullableArray}, v::DataArrays.DataArray{T,N})
+    NullableArray{T,N}(copy(v.data), BitArray(v.na))
+end
+
+# TODO this will no longer be needed once Feather is updated
+convertArray(::Type{NullableArray}, v::NullableArray) = copy(v)
+export convertArray
+
+
+function convert(::Type{DataFrames.DataFrame}, dt::DataTable)
+    df = DataFrames.DataFrame()
+    for name ∈ names(dt)
+        df[name] = convertArray(DataArrays.DataArray, dt[name])
+    end
+    df
+end
+
+
+function convert(::Type{DataTable}, df::DataFrames.DataFrame)
+    dt = DataTable()
+    for name ∈ names(df)
+        dt[name] = convertArray(NullableArray, df[name])
+    end
+    dt
+end
+export convert
 
 

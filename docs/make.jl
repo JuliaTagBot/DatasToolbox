@@ -1,4 +1,4 @@
-#!/usr/bin/julia
+#!/opt/julia/bin/julia
 using DatasToolbox
 using Documenter
 

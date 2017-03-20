@@ -5,9 +5,13 @@ module DatasToolbox
 
 using Reexport
 
-@reexport using DataFrames
+# @reexport using DataFrames
+@reexport using DataTables
+import DataFrames
+import DataArrays
 
-using DataFramesMeta
+import DataTables: describe, vcat # help silence warnings?
+
 using Feather
 using PyCall
 
@@ -20,6 +24,7 @@ import Base.convert
 import Base.normalize!
 import Base.Dict
 import Base.keys
+import Base.convert
 
 # the following are python imports that get used in various places
 const PyPickle = PyNULL()

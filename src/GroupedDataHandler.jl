@@ -6,7 +6,7 @@ I haven't decided yet whether I actually want to use this
 
 type GroupedDataHandler{T} <: AbstractDH{T}
 
-    df::DataFrame
+    df::DataTable
 
     colsInput::Vector{Symbol}
     colsOutput::Vector{Symbol}
@@ -21,11 +21,11 @@ type GroupedDataHandler{T} <: AbstractDH{T}
     norm::Vector{T}
     userange::Bool
 
-    dfTrain::DataFrame
-    dfTest::DataFrame
+    dfTrain::DataTable
+    dfTest::DataTable
 
-    dfTrain_grp::GroupedDataFrame
-    dfTest_grp::GroupedDataFrame
+    dfTrain_grp::GroupedDataTable
+    dfTest_grp::GroupedDataTable
 
     X_train::Dict{Any,Array{T}}
     y_train::Dict{Any,Array{T}}
@@ -37,7 +37,7 @@ type GroupedDataHandler{T} <: AbstractDH{T}
     yhat::Array{T}
     yhat_train::Array{T}
 
-    function GroupedDataHandler(df::DataFrame, class_cols::Vector{Symbol}; 
+    function GroupedDataHandler(df::DataTable, class_cols::Vector{Symbol}; 
                                 testfrac::AbstractFloat=0.0, 
                                 shuffle::Bool=false,
                                 input_cols::Vector{Symbol}=Symbol[],
@@ -67,7 +67,7 @@ end
 export GroupedDataHandler
 
 
-function keytuple(df::AbstractDataFrame, cols::Vector{Symbol}, idx::Integer=1)
+function keytuple(df::AbstractDataTable, cols::Vector{Symbol}, idx::Integer=1)
     tuple(convert(Array{Any}, df[idx, cols])...)
 end
 export keytuple
@@ -165,12 +165,12 @@ corresponding to the columns of matrices in `dict`, and rows corresponding to th
 of the original dataframe.  The keys of `dict` should be tuples like those produced by
 `keytuple`.  The type parameter `T` denotes the type of the matrices contained in `dict`.
 
-Note that the implmentation on this depends on the "private" members of `GroupedDataFrame`.
+Note that the implmentation on this depends on the "private" members of `GroupedDataTable`.
 """
-function _replace_values_into_grouped{T}(gp::GroupedDataFrame, dict::Dict, ::Type{T},
+function _replace_values_into_grouped{T}(gp::GroupedDataTable, dict::Dict, ::Type{T},
                                          new_col_names::Vector{Symbol},
                                          keycols::Vector{Symbol})
-    newcols = DataFrame([T for n ∈ new_col_names], new_col_names, size(gp.parent, 1))
+    newcols = DataTable([T for n ∈ new_col_names], new_col_names, size(gp.parent, 1))
     for (start, stop) ∈ zip(gp.starts, gp.ends)
         key = keytuple(gp.parent, keycols, gp.idx[start])
         y = get(dict, key, NullableArray(T, length(start:stop), length(new_col_names)))
@@ -226,11 +226,11 @@ to different subsets of the data.  One can supply the output `getTestAnalysisDat
 `data` or pass a `GroupedDataHandler` together with an output dictionary `ŷ`, in which
 case all the tables will be generated for you.
 """
-function getGroupedTestAnalysisData(data::DataFrame, keycols::Vector{Symbol},
+function getGroupedTestAnalysisData(data::DataTable, keycols::Vector{Symbol},
                                     names::Vector{Symbol}; 
                                     squared_error::Bool=true)
     by(data, keycols) do sdf
-        agg = DataFrame()
+        agg = DataTable()
         if isempty(sdf) 
             return agg
         end
@@ -249,7 +249,7 @@ function getGroupedTestAnalysisData(data::DataFrame, keycols::Vector{Symbol},
     end
 end
 
-function getGroupedTestAnalysisData(dh::AbstractDH, data::DataFrame, keycols::Vector{Symbol};
+function getGroupedTestAnalysisData(dh::AbstractDH, data::DataTable, keycols::Vector{Symbol};
                                     names::Vector{Symbol}=Symbol[],
                                     squared_error::Bool=true)
     if length(names) == 0
@@ -258,7 +258,7 @@ function getGroupedTestAnalysisData(dh::AbstractDH, data::DataFrame, keycols::Ve
     getGroupedTestAnalysisData(data, keycols, names, squared_error=squared_error)
 end
 
-function getGroupedTestAnalysisData(gdh::GroupedDataHandler, data::DataFrame;
+function getGroupedTestAnalysisData(gdh::GroupedDataHandler, data::DataTable;
                                     names::Vector{Symbol}=Symbol[],
                                     squared_error::Bool=true)
     getGroupedTestAnalysisData(gdh, data, gdh.colsClass, names=names, 

@@ -21,7 +21,7 @@ The parameter T specifies the datatype of the input, output arrays.
 type DataHandler{T} <: AbstractDH{T}
 
     # dataframe where all data is kept
-    df::DataFrame
+    df::DataTable
 
     colsInput::Vector{Symbol}
     colsOutput::Vector{Symbol}
@@ -33,9 +33,9 @@ type DataHandler{T} <: AbstractDH{T}
     userange::Bool
 
     # training data, is a subset of df
-    dfTrain::DataFrame
+    dfTrain::DataTable
     # testing data, is a subset of df
-    dfTest::DataFrame
+    dfTest::DataTable
 
     # these are the arrays of training, testing data
     X_train::Array{T}
@@ -48,7 +48,7 @@ type DataHandler{T} <: AbstractDH{T}
     yhat_train::Array{T}
 
     """
-        DataHandler{T}(df::DataFrame; testfrac::AbstractFloat=0.0, shuffle::Bool=false,
+        DataHandler{T}(df::DataTable; testfrac::AbstractFloat=0.0, shuffle::Bool=false,
                     input_cols::Array{Symbol}=Symbol[], output_cols::Array{Symbol}=Symbol[],
                     normalize_cols::Array{Symbol}=Symbol[], assign::Bool=false,
                     userange::Bool=false)
@@ -62,7 +62,7 @@ type DataHandler{T} <: AbstractDH{T}
     Note that currently `DataHandler` can't handle dataframes with null values, and
     automatically drops all rows containing null values.
     """
-    function DataHandler(df::DataFrame; testfrac::AbstractFloat=0.0, shuffle::Bool=false,
+    function DataHandler(df::DataTable; testfrac::AbstractFloat=0.0, shuffle::Bool=false,
                          input_cols::Vector{Symbol}=Symbol[], 
                          output_cols::Vector{Symbol}=Symbol[],
                          normalize_cols::Vector{Symbol}=Symbol[],
@@ -292,7 +292,7 @@ function split!(dh::AbstractDH, index::Integer; assign::Bool=true)
     @assert index ≤ size(dh.df)[1] "Index value too large for dataframe."
     dh.dfTrain = dh.df[1:index, :]
     if index == size(dh.df)[1]
-        dh.dfTest = DataFrame()
+        dh.dfTest = DataTable()
     else
         dh.dfTest = dh.df[(index+1):end, :]
     end
@@ -364,7 +364,7 @@ export @selectTest!
 """
     @split!(dh, expr)
 
-Splits the `DataHandler`'s DataFrame into training in test set, such that the test set is the
+Splits the `DataHandler`'s DataTable into training in test set, such that the test set is the
 set of datapoints for which `expr` is true, and the training set is the set of datapoints for
 which `expr` is false.  `expr` should be an expression that evaluates to `Bool` with symbols
 in place of column names.  For example, if the columns of the dataframe are `[:x1, :x2, :x3]`

@@ -1,5 +1,8 @@
 # DatasToolbox
 
+___NOTE:___ DatasToolbox is being split into multiple packages.  For now I'm keeping it around
+as an alias for importing all said packages.
+
 This is a set of tools for performing common, generic manipulations on data, primarily for 
 machine learning and optimization.  It also contains a set of tools for easily converting
 from Python in a type-correct way.

@@ -10,7 +10,7 @@ The parameter T specifies the datatype of the input, output arrays.
 type TimeSeriesHandler{T} <: AbstractDH{T}
 
     # dataframe where all data is kept
-    df::DataFrame
+    df::DataTable
 
     colsInput::Array{Symbol, 1}
     colsOutput::Array{Symbol, 1}
@@ -22,9 +22,9 @@ type TimeSeriesHandler{T} <: AbstractDH{T}
     userange::Bool
 
     # training data, is a subset of df
-    dfTrain::DataFrame
+    dfTrain::DataTable
     # testing data, is a subset of df
-    dfTest::DataFrame
+    dfTest::DataTable
 
     # these are the arrays of training, testing data
     X_train::Array{T}
@@ -42,7 +42,7 @@ type TimeSeriesHandler{T} <: AbstractDH{T}
     seq_length::Int64
 
     """
-        TimeSeriesHandler(df::DataFrame, timeindex::Symbol, seq_length::Integer;
+        TimeSeriesHandler(df::DataTable, timeindex::Symbol, seq_length::Integer;
                           shuffle::Bool=false, n_test_sequences::Integer=0,
                           input_cols::Array{Symbol}=Symbol[],
                           output_cols::Array{Symbol}=Symbol[],
@@ -56,7 +56,7 @@ type TimeSeriesHandler{T} <: AbstractDH{T}
     this case it makes sense for `input_cols == output_cols` (in fact that is probably the
     most common use case).
     """
-    function TimeSeriesHandler(df::DataFrame, timeindex::Symbol, seq_length::Integer; 
+    function TimeSeriesHandler(df::DataTable, timeindex::Symbol, seq_length::Integer; 
                                shuffle::Bool=false,
                                n_test_sequences::Integer=0,
                                input_cols::Array{Symbol}=Symbol[], 
@@ -154,13 +154,13 @@ function assignTrain!(dh::TimeSeriesHandler; sort::Bool=true, parallel::Bool=fal
     dh.X_train, dh.y_train = gad(:dfTrain, dh, sort=sort)
 end
 
-function assignTrain!(dh::TimeSeriesHandler, df::AbstractDataFrame;
+function assignTrain!(dh::TimeSeriesHandler, df::AbstractDataTable;
                       sort::Bool=true, parallel::Bool=false)
     dh.dfTrain = df
     assignTrain!(dh, sort=sort, parallel=parallel)
 end
 
-function assignTrain!{DFT<:AbstractDataFrame}(dh::TimeSeriesHandler, dfs::Vector{DFT}; 
+function assignTrain!{DFT<:AbstractDataTable}(dh::TimeSeriesHandler, dfs::Vector{DFT}; 
                                               sort::Bool=true)
     vcat_tuples(x,y) = vcat(x[1], y[1]), vcat(x[2], y[2]) 
     dh.X_train, dh.y_train = mapreduce(vcat_tuples, dfs) do df
@@ -189,7 +189,7 @@ function assignTest!(dh::TimeSeriesHandler; sort::Bool=true)
     dh.X_test, dh.y_test = _get_assign_data(:dfTest, dh, sort=sort)
 end
 
-function assignTest!(dh::TimeSeriesHandler, df::AbstractDataFrame; sort::Bool=true)
+function assignTest!(dh::TimeSeriesHandler, df::AbstractDataTable; sort::Bool=true)
     dh.dfTest = df
     assignTest!(dh, sort=sort)
 end
